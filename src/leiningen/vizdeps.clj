@@ -8,8 +8,6 @@
             [leiningen.core.project :as project]
             [clojure.string :as str]))
 
-(require '[clojure.pprint :refer [pprint]])
-
 (defn- dependency->label
   [dependency]
   (let [[artifact-name version] dependency]
@@ -67,22 +65,17 @@
         (add-dependencies :root (classpath/dependency-hierarchy :dependencies project')))))
 
 (defn- node-graph
-  [dependency-graph]
+  [dependency-graph options]
   (reduce into
-          [(d/graph-attrs {:rankdir :LR})]
+          [(d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)})]
           [(for [[k v] (:nodes dependency-graph)]
              [k v])
            (:edges dependency-graph)]))
 
-(defn- tap [v] (println "tap:")
-  (pprint v)
-  v)
-
 (defn- build-dot
-  [project include-dev]
-  (-> (dependency-graph project include-dev)
-      node-graph
-      tap
+  [project options]
+  (-> (dependency-graph project (:dev options))
+      (node-graph options)
       d/digraph
       d/dot))
 
@@ -98,6 +91,7 @@
     :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]]
    ["-n" "--no-view" "If given, the image will not be opened after creation."
     :default false]
+   ["-v" "--vertical" "Use a vertical, not horizontal, layout."]
    ["-d" "--dev" "Include :dev dependencies in the graph."]
    ["-h" "--help" "This usage summary."]])
 
@@ -127,7 +121,7 @@
       (let [{:keys [output-file no-view dev]} options
             output-format (-> output-file allowed-extension keyword)]
         (-> project
-            (build-dot dev)
+            (build-dot options)
             (d/save! output-file {:format output-format}))
 
         (main/info "Wrote dependency chart to:" output-file)

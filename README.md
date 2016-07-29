@@ -14,6 +14,7 @@ Usage: lein vizdeps [options]
 Options:
   -o, --output-file FILE  target/dependencies.pdf  Output file path. Extension chooses format: pdf or png.
   -n, --no-view                                    If given, the image will not be opened after creation.
+  -v, --vertical                                   Use a vertical, not horizontal, layout.
   -d, --dev                                        Include :dev dependencies in the graph.
   -h, --help                                       This usage summary.
 ```
