@@ -1,7 +1,9 @@
-# visualize-dependencies
+# walmartlabs/vizdeps
 
 An alternative to `lein deps :tree` that uses Graphviz to present
 a dependency diagram.
+
+![active-status-dependencies](images/active-status-deps.png)
 
 ## Usage
 
