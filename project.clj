@@ -1,5 +1,5 @@
-(defproject com.walmartlabs/visualize-dependencies "0.1.0"
-  :description "Visualize project dependencies using Graphviz."
+(defproject walmartlabs/vizdeps "0.1.0"
+  :description "Visualize Leiningen project dependencies using Graphviz."
   :url "http://example.com/FIXME"
   :license {:name "Apache Sofware License 2.0"
             :url  "http://www.apache.org/licenses/LICENSE-2.0.html"}

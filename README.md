@@ -5,7 +5,7 @@ a dependency diagram.
 
 ## Usage
 
-Put `[visualize-dependencies "0.1.0"]` into the `:plugins` vector of your `:user`
+Put `[walmartlabs/vizdeps "0.1.0"]` into the `:plugins` vector of your `:user`
 profile.
 
 ```
