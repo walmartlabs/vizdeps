@@ -6,7 +6,9 @@
             [clojure.java.browse :refer [browse-url]]
             [leiningen.core.classpath :as classpath]
             [leiningen.core.project :as project]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.java.io :as io])
+  (:import [java.io File]))
 
 (defn- dependency->label
   [dependency]
@@ -87,6 +89,7 @@
 
 (def ^:private cli-options
   [["-o" "--output-file FILE" "Output file path. Extension chooses format: pdf or png."
+    :id :output-path
     :default "target/dependencies.pdf"
     :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]]
    ["-n" "--no-view" "If given, the image will not be opened after creation."
@@ -118,13 +121,20 @@
 
     (if (or (:help options) errors)
       (usage summary errors)
-      (let [{:keys [output-file no-view dev]} options
-            output-format (-> output-file allowed-extension keyword)]
+      (let [{:keys [output-path no-view]} options
+            output-format (-> output-path allowed-extension keyword)
+            ^File output-file (io/file output-path)
+            output-dir (.getParentFile output-file)]
+
+        (when output-dir
+          (.mkdirs output-dir))
+
+
         (-> project
             (build-dot options)
             (d/save! output-file {:format output-format}))
 
-        (main/info "Wrote dependency chart to:" output-file)
+        (main/info "Wrote dependency chart to:" output-path)
 
         (when-not no-view
-          (browse-url output-file))))))
+          (browse-url output-path))))))
