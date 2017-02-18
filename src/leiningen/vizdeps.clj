@@ -10,24 +10,42 @@
             [clojure.java.io :as io])
   (:import [java.io File]))
 
+
 (defn ^:private dependency->label
   [dependency]
-  (let [[artifact-name version] dependency]
-    (format "%s%n%s" artifact-name version)))
+  (let [[artifact-name version] dependency
+        ^String group (some-> artifact-name namespace name)
+        ^String module (name artifact-name)]
+    (str group
+         (when group "/")
+         (when (and group (< 20 (+ (.length module)
+                                   (.length group))))
+           \newline)
+         module " " version)))
 
 (defn gen-graph-id
   [k]
   (str (gensym (str (name k) "-"))))
 
 (defn ^:private add-edge
-  [graph from-graph-id to-graph-id]
-  (update-in graph [:edges] conj [from-graph-id to-graph-id]))
+  [graph from-graph-id to-graph-id label-version]
+  (let [edge (cond-> [from-graph-id to-graph-id]
+               label-version (conj {:color :red
+                                    :label label-version}))]
+    (update graph :edges conj edge)))
 
 (defn ^:private add-node
   [graph node-id attributes]
   (assoc-in graph [:nodes node-id] (if (string? attributes)
                                      {:label attributes}
                                      attributes)))
+
+(defn ^:private normalize-artifact
+  [dependency]
+  (let [artifact (first dependency)]
+    (if-not (= (namespace artifact) (name artifact))
+      dependency
+      (assoc dependency 0 (symbol (name artifact))))))
 
 (defn ^:private immediate-dependencies
   [project dependency]
@@ -46,21 +64,25 @@
 
 (defn ^:private add-dependency-tree
   [graph project containing-node-id dependency]
-  (let [artifact (first dependency)
-        node-id (get-in graph [:deps artifact])]
+  (let [[artifact version] dependency
+        label-version (when (not= version (get-in graph [:dependencies artifact]))
+                            version)
+        node-id (get-in graph [:node-ids artifact])]
     ;; When the node has been found from some other dependency,
     ;; just add a new edge to it.
-    ;; TODO: Can we label the edge w/ the version number on conflict?
     (if node-id
-      (add-edge graph containing-node-id node-id)
+      (add-edge graph containing-node-id node-id label-version)
       ;; Otherwise its a new dependency in the graph and we want
       ;; to add the corresponding node and the edge to it,
       ;; but also take care of dependencies of the new node.
       (let [sub-node-id (-> dependency first gen-graph-id)]
         (-> graph
-            (assoc-in [:deps (first dependency)] sub-node-id)
+            (assoc-in [:node-ids (first dependency)] sub-node-id)
             (add-node sub-node-id (dependency->label dependency))
-            (add-edge containing-node-id sub-node-id)
+            (add-edge containing-node-id sub-node-id label-version)
+            ;; TODO: This may be a problem as the version of the dependency here
+            ;; may be overridden by a version from elsewhere (there is no guarantee
+            ;; that vizdeps walks the tree in anything like the same order as Aether and Pomengranate).
             (add-dependencies sub-node-id project
                               (immediate-dependencies project dependency)))))))
 
@@ -71,34 +93,52 @@
           graph
           dependencies))
 
+(defn ^:private build-dependency-map
+  "Consumes a hierarchy and produces a map from artifact to version, used to identify
+  which dependency linkages have had their version changed."
+  ([hierarchy]
+   (build-dependency-map {} hierarchy))
+  ([version-map hierarchy]
+   (reduce-kv (fn [m dep sub-hierarchy]
+                (-> m
+                    (assoc (first dep) (second dep))
+                    (build-dependency-map sub-hierarchy)))
+              version-map
+              hierarchy)))
+
 (defn ^:private dependency-graph
   "Builds out a structured dependency graph, from which a Dorothy node graph can be constructed."
   [project include-dev]
   (let [profiles (if-not include-dev [:user] [:user :dev])
         project' (project/set-profiles project profiles)
-        root-dependency [(symbol (-> project :group str) (-> project :name str)) (:version project)]]
-
+        root-dependency [(symbol (-> project :group str) (-> project :name str)) (:version project)]
+        dependency-map (->> project'                        ;
+                            (classpath/dependency-hierarchy :dependencies)
+                            build-dependency-map)]
     ;; :nodes - map from node graph id to node attributes
     ;; :edges - list of edge tuples [from graph id, to graph id]
     ;; :sets - map from set id (a keyword or a symbol, typically) to a generated node graph id (a symbol)
-    ;; :deps - map from artifact symbol (e.g., com.walmartlab/shared-deps) to a generated node graph id
-    ;; :processed - set of artifact symbols that have been fully processed
+    ;; :node-ids - map from artifact symbol (e.g., com.walmartlab/shared-deps) to a generated node graph id
+    ;; :dependencies - map from artifact symbol to version number, as supplied by Leiningen
     (add-dependencies {:nodes {:root {:label (dependency->label root-dependency)
                                       :shape :doubleoctagon}}
                        :edges []
                        :sets {}
-                       :deps {}}
+                       :node-ids {}
+                       :dependencies dependency-map}
                       :root
                       project'
-                      (:dependencies project'))))
+                      (->> project'
+                           :dependencies
+                           (map normalize-artifact)))))
 
 (defn ^:private node-graph
   [dependency-graph options]
-  (reduce into
-          [(d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)})]
-          [(for [[k v] (:nodes dependency-graph)]
-             [k v])
-           (:edges dependency-graph)]))
+  (concat
+    [(d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)})]
+    (for [[k v] (:nodes dependency-graph)]
+      [k v])
+    (:edges dependency-graph)))
 
 (defn ^:private build-dot
   [project options]
