@@ -1,4 +1,4 @@
-## 0.1.2 -- UNRELEASED
+## 0.1.2 -- 17 Feb 2017
 
 Added the -s / --save-dot option.
 
