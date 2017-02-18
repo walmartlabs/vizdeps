@@ -65,7 +65,8 @@
 (defn ^:private add-dependency-tree
   [graph project containing-node-id dependency]
   (let [[artifact version] dependency
-        label-version (when (not= version (get-in graph [:dependencies artifact]))
+        resolved-dependency (get-in graph [:dependencies artifact])
+        label-version (when (not= version (second resolved-dependency))
                             version)
         node-id (get-in graph [:node-ids artifact])]
     ;; When the node has been found from some other dependency,
@@ -80,11 +81,12 @@
             (assoc-in [:node-ids (first dependency)] sub-node-id)
             (add-node sub-node-id (dependency->label dependency))
             (add-edge containing-node-id sub-node-id label-version)
-            ;; TODO: This may be a problem as the version of the dependency here
-            ;; may be overridden by a version from elsewhere (there is no guarantee
-            ;; that vizdeps walks the tree in anything like the same order as Aether and Pomengranate).
+            ;; Aether/Pomenegrate may reach a dependency by a differnt navigation of the
+            ;; dependency tree, and so have a different version than the one for this
+            ;; dependency, so always use the A/P resolved dependency (including version and
+            ;; exclusions) to compute transitive dependencies.
             (add-dependencies sub-node-id project
-                              (immediate-dependencies project dependency)))))))
+                              (immediate-dependencies project resolved-dependency)))))))
 
 (defn ^:private add-dependencies
   [graph containing-node-id project dependencies]
@@ -101,7 +103,7 @@
   ([version-map hierarchy]
    (reduce-kv (fn [m dep sub-hierarchy]
                 (-> m
-                    (assoc (first dep) (second dep))
+                    (assoc (first dep) dep)
                     (build-dependency-map sub-hierarchy)))
               version-map
               hierarchy)))
