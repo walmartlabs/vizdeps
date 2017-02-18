@@ -21,7 +21,7 @@
          (when (and group (< 20 (+ (.length module)
                                    (.length group))))
            \newline)
-         module " " version)))
+         module \newline version)))
 
 (defn gen-graph-id
   [k]

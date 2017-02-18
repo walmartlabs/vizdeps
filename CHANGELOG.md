@@ -1,3 +1,7 @@
+## 0.1.3 -- UNRELEASED
+
+Move version numbers onto their own line.
+
 ## 0.1.2 -- 17 Feb 2017
 
 Added the -s / --save-dot option.
