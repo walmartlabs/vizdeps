@@ -41,6 +41,6 @@ Options:
   
 ## License
 
-Copyright © 2016 Walmartlabs
+Copyright © 2016-2017 Walmartlabs
 
 Distributed under the Apache Software License 2.0.
