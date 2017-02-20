@@ -31,13 +31,13 @@ profile.
 Usage: lein vizdeps [options]
 
 Options:
-  -o, --output-file FILE  target/dependencies.pdf  Output file path. Extension chooses format: pdf or png.
-  -s, --save-dot                                   Save the generated GraphViz DOT file well as the output file.
-  -n, --no-view                                    If given, the image will not be opened after creation.
-  -v, --vertical                                   Use a vertical, not horizontal, layout.
-  -d, --dev                                        Include :dev dependencies in the graph.
-  -h, --help                                       This usage summary.
-```
+  -o, --output-file FILE    target/dependencies.pdf  Output file path. Extension chooses format: pdf or png.
+  -s, --save-dot                                     Save the generated GraphViz DOT file well as the output file.
+  -n, --no-view                                      If given, the image will not be opened after creation.
+  -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue.
+  -v, --vertical                                     Use a vertical, not horizontal, layout.
+  -d, --dev                                          Include :dev dependencies in the graph.
+  -h, --help                                         This usage summary.```
   
 ## License
 

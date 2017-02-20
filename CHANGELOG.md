@@ -1,6 +1,7 @@
 ## 0.1.3 -- UNRELEASED
 
-Move version numbers onto their own line.
+Group, module, and version each on their own line.
+Add --highlight option to highlight an artifact and dependencies to it, in blue.
 
 ## 0.1.2 -- 17 Feb 2017
 

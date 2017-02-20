@@ -22,23 +22,29 @@
          \newline
          version)))
 
-(defn gen-graph-id
+(defn ^:private gen-graph-id
   [k]
   (str (gensym (str (name k) "-"))))
 
 (defn ^:private add-edge
   [graph from-graph-id to-graph-id resolved-dependency version]
   (let [version-mismatch? (not= version (second resolved-dependency))
+        highlight? (= (:highlight graph) (first resolved-dependency))
+        edge-attrs (cond-> nil
+                     highlight? (assoc :color :blue)
+                     version-mismatch? (assoc :color :red :label version))
         edge (cond-> [from-graph-id to-graph-id]
-               version-mismatch? (conj {:color :red
-                                        :label version}))]
+               edge-attrs (conj edge-attrs))]
     (update graph :edges conj edge)))
 
 (defn ^:private add-node
-  [graph node-id attributes]
-  (assoc-in graph [:nodes node-id] (if (string? attributes)
-                                     {:label attributes}
-                                     attributes)))
+  [graph artifact node-id attributes]
+  (let [highlight? (= (:highlight graph) artifact)
+        node-attrs (cond-> (if (string? attributes)
+                             {:label attributes}
+                             attributes)
+                     highlight? (assoc :color :blue))]
+    (assoc-in graph [:nodes node-id] node-attrs)))
 
 (defn ^:private normalize-artifact
   [dependency]
@@ -77,7 +83,7 @@
       (let [sub-node-id (-> dependency first gen-graph-id)]
         (-> graph
             (assoc-in [:node-ids (first dependency)] sub-node-id)
-            (add-node sub-node-id (dependency->label dependency))
+            (add-node artifact sub-node-id (dependency->label dependency))
             (add-edge containing-node-id sub-node-id resolved-dependency version)
             ;; Aether/Pomenegrate may reach a dependency by a differnt navigation of the
             ;; dependency tree, and so have a different version than the one for this
@@ -108,7 +114,7 @@
 
 (defn ^:private dependency-graph
   "Builds out a structured dependency graph, from which a Dorothy node graph can be constructed."
-  [project include-dev]
+  [project include-dev highlight-artifact]
   (let [profiles (if-not include-dev [:user] [:user :dev])
         project' (project/set-profiles project profiles)
         root-dependency [(symbol (-> project :group str) (-> project :name str)) (:version project)]
@@ -125,6 +131,8 @@
                        :edges []
                        :sets {}
                        :node-ids {}
+                       :highlight (when highlight-artifact
+                                    (symbol highlight-artifact))
                        :dependencies dependency-map}
                       :root
                       project'
@@ -142,7 +150,7 @@
 
 (defn ^:private build-dot
   [project options]
-  (-> (dependency-graph project (:dev options))
+  (-> (dependency-graph project (:dev options) (:highlight options))
       (node-graph options)
       d/digraph
       d/dot))
@@ -161,6 +169,7 @@
    ["-s" "--save-dot" "Save the generated GraphViz DOT file well as the output file."]
    ["-n" "--no-view" "If given, the image will not be opened after creation."
     :default false]
+   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."]
    ["-v" "--vertical" "Use a vertical, not horizontal, layout."]
    ["-d" "--dev" "Include :dev dependencies in the graph."]
    ["-h" "--help" "This usage summary."]])
