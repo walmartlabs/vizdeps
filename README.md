@@ -37,7 +37,8 @@ Options:
   -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue.
   -v, --vertical                                     Use a vertical, not horizontal, layout.
   -d, --dev                                          Include :dev dependencies in the graph.
-  -h, --help                                         This usage summary.```
+  -h, --help                                         This usage summary.
+```
   
 ## License
 
