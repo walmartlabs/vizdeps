@@ -1,4 +1,4 @@
-## 0.1.3 -- UNRELEASED
+## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.
 Add --highlight option to highlight an artifact and dependencies to it, in blue.
