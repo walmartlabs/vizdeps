@@ -112,18 +112,6 @@
           graph
           dependencies))
 
-(defn ^:private build-dependency-map
-  "Consumes a hierarchy and produces a map from artifact to version, used to identify
-  which dependency linkages have had their version changed."
-  ([hierarchy]
-   (build-dependency-map {} hierarchy))
-  ([version-map hierarchy]
-   (reduce-kv (fn [m dep sub-hierarchy]
-                (-> m
-                    (assoc (first dep) dep)
-                    (build-dependency-map sub-hierarchy)))
-              version-map
-              hierarchy)))
 
 (defn ^:private dependency-graph
   "Builds out a structured dependency graph, from which a Dorothy node graph can be constructed."
@@ -131,9 +119,7 @@
   (let [profiles (if-not include-dev [:user] [:user :dev])
         project' (project/set-profiles project profiles)
         root-dependency [(symbol (-> project :group str) (-> project :name str)) (:version project)]
-        dependency-map (->> project'                        ;
-                            (classpath/dependency-hierarchy :dependencies)
-                            build-dependency-map)]
+        dependency-map (common/flatten-dependencies project')]
     ;; :nodes - map from node graph id to node attributes
     ;; :edges - list of edge tuples [from graph id, to graph id]
     ;; :sets - map from set id (a keyword or a symbol, typically) to a generated node graph id (a symbol)
@@ -167,7 +153,6 @@
       (node-graph options)
       d/digraph
       d/dot))
-
 
 (def ^:private cli-options
   [(common/cli-output-file "target/dependencies.pdf")

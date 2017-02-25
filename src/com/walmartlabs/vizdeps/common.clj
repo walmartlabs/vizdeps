@@ -4,10 +4,19 @@
     [clojure.java.io :as io]
     [dorothy.core :as d]
     [clojure.java.browse :refer [browse-url]]
-    [clojure.tools.cli :refer [parse-opts]])
+    [clojure.tools.cli :refer [parse-opts]]
+    [leiningen.core.classpath :as classpath])
   (:import (java.io File)))
 
-(defn allowed-extension
+(defn map-vals
+  [f m]
+  (when m
+    (reduce-kv (fn [m k v]
+                 (assoc m k (f v)))
+               (empty m)
+               m)))
+
+(defn ^:private allowed-extension
   [path]
   (let [x (str/last-index-of path ".")
         ext (subs path (inc x))]
@@ -76,3 +85,25 @@
       (browse-url output-path)))
 
   nil)
+
+(defn ^:private build-dependency-map
+  "Consumes a hierarchy and produces a map from artifact to version, used to identify
+  which dependency linkages have had their version changed."
+  ([hierarchy]
+   (build-dependency-map {} hierarchy))
+  ([version-map hierarchy]
+   (reduce-kv (fn [m dep sub-hierarchy]
+                (-> m
+                    (assoc (first dep) dep)
+                    (build-dependency-map sub-hierarchy)))
+              version-map
+              hierarchy)))
+
+(defn flatten-dependencies
+  [project]
+  "Resolves dependencies for the project and returns a map from artifact
+  symbol to artifact coord vector."
+  (->> project
+       (classpath/dependency-hierarchy :dependencies)
+       build-dependency-map))
+

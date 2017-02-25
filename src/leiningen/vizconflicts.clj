@@ -2,7 +2,21 @@
   "Graphviz visualization of conflicts in a multi-module project."
   (:require
     [com.walmartlabs.vizdeps.common :as common]
-    [leiningen.core.main :as main]))
+    [clojure.pprint :refer [pprint]]
+    [leiningen.core.project :as project]))
+
+(defn ^:private projects-map
+  "Generates a map from sub module name (string)
+   to initialized project."
+  [root-project]
+  (reduce (fn [m module-name]
+            (assoc m module-name
+                   (-> (str module-name "/project.clj")
+                       project/read
+                       project/init-project)))
+          {}
+          (:sub root-project)))
+
 
 (def ^:private cli-options
   [(common/cli-output-file "target/conflicts.pdf")
@@ -15,4 +29,7 @@
   {:pass-through-help true}
   [project & args]
   (when-let [options (common/parse-cli-options "vizconflicts" cli-options args)]
-    (prn options)))
+    (->> project
+         projects-map
+         (common/map-vals common/flatten-dependencies)
+         pprint)))
