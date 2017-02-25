@@ -1,15 +1,11 @@
 (ns leiningen.vizdeps
   "Graphviz visualization of project dependencies."
-  (:require [leiningen.core.main :as main]
-            [clojure.tools.cli :refer [parse-opts]]
-            [dorothy.core :as d]
-            [clojure.java.browse :refer [browse-url]]
-            [leiningen.core.classpath :as classpath]
-            [leiningen.core.project :as project]
-            [clojure.string :as str]
-            [clojure.java.io :as io])
-  (:import [java.io File]))
-
+  (:require
+    [com.walmartlabs.vizdeps.common :as common]
+    [leiningen.core.main :as main]
+    [dorothy.core :as d]
+    [leiningen.core.classpath :as classpath]
+    [leiningen.core.project :as project]))
 
 (defn ^:private dependency->label
   [dependency]
@@ -172,36 +168,15 @@
       d/digraph
       d/dot))
 
-(defn ^:private allowed-extension
-  [path]
-  (let [x (str/last-index-of path ".")
-        ext (subs path (inc x))]
-    (#{"png" "pdf"} ext)))
 
 (def ^:private cli-options
-  [["-o" "--output-file FILE" "Output file path. Extension chooses format: pdf or png."
-    :id :output-path
-    :default "target/dependencies.pdf"
-    :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]]
-   ["-s" "--save-dot" "Save the generated GraphViz DOT file well as the output file."]
-   ["-n" "--no-view" "If given, the image will not be opened after creation."
-    :default false]
+  [(common/cli-output-file "target/dependencies.pdf")
+   common/cli-save-dot
+   common/cli-no-view
    ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."]
    ["-v" "--vertical" "Use a vertical, not horizontal, layout."]
    ["-d" "--dev" "Include :dev dependencies in the graph."]
-   ["-h" "--help" "This usage summary."]])
-
-(defn ^:private usage [summary errors]
-  (let [main (->> ["Usage: lein vizdeps [options]"
-                   ""
-                   "Options:"
-                   summary]
-                  (str/join \newline))]
-    (println main)
-
-    (when errors
-      (println "\nErrors:")
-      (doseq [e errors] (println " " e)))))
+   common/cli-help])
 
 (defn vizdeps
   "Visualizes dependencies using Graphviz.
@@ -210,29 +185,7 @@
   Command line options allow the image to be written to a file instead."
   {:pass-through-help true}
   [project & args]
-  (let [{:keys [options errors summary]} (parse-opts args cli-options)]
-
-    (if (or (:help options) errors)
-      (usage summary errors)
-      (let [{:keys [output-path no-view]} options
-            output-format (-> output-path allowed-extension keyword)
-            ^File output-file (io/file output-path)
-            output-dir (.getParentFile output-file)]
-
-        (when output-dir
-          (.mkdirs output-dir))
-
-        (let [dot (build-dot project options)]
-
-          (when (:save-dot options)
-            (let [x (str/last-index-of output-path ".")
-                  dot-path (str (subs output-path 0 x) ".dot")
-                  ^File dot-file (io/file dot-path)]
-              (spit dot-file dot)))
-
-          (d/save! dot output-file {:format output-format})
-
-          (main/info "Wrote dependency chart to:" output-path))
-
-        (when-not no-view
-          (browse-url output-path))))))
+  (when-let [options (common/parse-cli-options "vizdeps" cli-options args)]
+    (let [dot (build-dot project options)]
+      (common/write-files-and-view dot options)
+      (main/info "Wrote dependency chart to:" (:output-path options)))))
