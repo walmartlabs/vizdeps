@@ -8,13 +8,10 @@
     [leiningen.core.classpath :as classpath])
   (:import (java.io File)))
 
-(defn map-vals
-  [f m]
-  (when m
-    (reduce-kv (fn [m k v]
-                 (assoc m k (f v)))
-               (empty m)
-               m)))
+(defn gen-graph-id
+  "Create a unique string, based on the provided node-name (keyword, symbol, or string)."
+  [node-name]
+  (str (gensym (str (name node-name) "-"))))
 
 (defn ^:private allowed-extension
   [path]

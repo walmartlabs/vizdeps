@@ -1,7 +1,8 @@
 (ns leiningen.vizdeps
   "Graphviz visualization of project dependencies."
   (:require
-    [com.walmartlabs.vizdeps.common :as common]
+    [com.walmartlabs.vizdeps.common :as common
+     :refer [gen-graph-id]]
     [leiningen.core.main :as main]
     [dorothy.core :as d]
     [leiningen.core.classpath :as classpath]
@@ -18,9 +19,6 @@
          \newline
          version)))
 
-(defn ^:private gen-graph-id
-  [k]
-  (str (gensym (str (name k) "-"))))
 
 (defn ^:private add-edge
   [graph from-graph-id to-graph-id resolved-dependency version]
