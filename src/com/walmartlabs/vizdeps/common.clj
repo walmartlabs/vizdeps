@@ -19,6 +19,10 @@
         ext (subs path (inc x))]
     (#{"png" "pdf"} ext)))
 
+(defn graph-attrs
+  [options]
+  (d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)}))
+
 (def cli-help ["-h" "--help" "This usage summary."])
 
 (def cli-save-dot ["-s" "--save-dot" "Save the generated GraphViz DOT file well as the output file."])
@@ -33,6 +37,12 @@
    :id :output-path
    :default default-path
    :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]])
+
+(def cli-highlight
+  ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."])
+
+(def cli-vertical
+  ["-v" "--vertical" "Use a vertical, not horizontal, layout."])
 
 (defn ^:private usage
   [command summary errors]

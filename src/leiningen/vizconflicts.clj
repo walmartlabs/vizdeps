@@ -47,8 +47,9 @@
        new-node-id])))
 
 (defn ^:private add-version-edge
-  [graph project-node-id artifact-node-id version]
-  (let [edge [project-node-id artifact-node-id {:label version}]]
+  [graph project-node-id artifact-node-id version node-base]
+  (let [edge [project-node-id artifact-node-id (merge node-base
+                                                      {:label version})]]
     (update graph :edges conj edge)))
 
 (defn ^:private to-label [sym]
@@ -61,11 +62,15 @@
 (defn ^:private add-project-to-artifact-edges
   [graph artifact-symbol version->project-map]
   (let [artifact-node-id (gen-graph-id artifact-symbol)
-        artifact-node {:label (to-label artifact-symbol)}]
+        node-base (when (= artifact-symbol (:highlight graph))
+                    {:color :blue
+                     :fontcolor :blue})
+        artifact-node (merge node-base
+                             {:label (to-label artifact-symbol)})]
     (reduce-kv (fn [g version project-names]
                  (reduce (fn [g project-name]
                            (let [[g' node-id] (project-name->node g project-name)]
-                             (add-version-edge g' node-id artifact-node-id version)))
+                             (add-version-edge g' node-id artifact-node-id version node-base)))
                          g
                          project-names))
                (assoc-in graph [:nodes artifact-node-id] artifact-node)
@@ -73,8 +78,11 @@
 
 (defn ^:private conflicts-graph
   [options artifact->versions-map]
-  (let [graph (-> {:nodes {}
+  (let [{:keys [highlight]} options
+        graph (-> {:nodes {}
                    :project-node-ids {}
+                   :highlight (when highlight
+                                (symbol highlight))
                    :edges []})]
     (reduce-kv add-project-to-artifact-edges
                graph
@@ -83,7 +91,7 @@
 (defn ^:private node-graph
   [options conflicts-graph]
   (concat
-    [(d/graph-attrs {:rankdir :LR})]
+    [(common/graph-attrs options)]
     (-> conflicts-graph :nodes seq)
     (:edges conflicts-graph)))
 
@@ -92,6 +100,8 @@
   [(common/cli-output-file "target/conflicts.pdf")
    common/cli-save-dot
    common/cli-no-view
+   common/cli-highlight
+   common/cli-vertical
    common/cli-help])
 
 (defn vizconflicts

@@ -140,9 +140,8 @@
 (defn ^:private node-graph
   [dependency-graph options]
   (concat
-    [(d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)})]
-    (for [[k v] (:nodes dependency-graph)]
-      [k v])
+    [(common/graph-attrs options)]
+    (-> dependency-graph :nodes seq)
     (:edges dependency-graph)))
 
 (defn ^:private build-dot
@@ -156,8 +155,8 @@
   [(common/cli-output-file "target/dependencies.pdf")
    common/cli-save-dot
    common/cli-no-view
-   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."]
-   ["-v" "--vertical" "Use a vertical, not horizontal, layout."]
+   common/cli-highlight
+   common/cli-vertical
    ["-d" "--dev" "Include :dev dependencies in the graph."]
    common/cli-help])
 
