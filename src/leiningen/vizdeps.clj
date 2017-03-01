@@ -140,7 +140,7 @@
 (defn ^:private node-graph
   [dependency-graph options]
   (concat
-    [(common/graph-attrs options)]
+    [(d/graph-attrs (common/graph-attrs options))]
     (-> dependency-graph :nodes seq)
     (:edges dependency-graph)))
 

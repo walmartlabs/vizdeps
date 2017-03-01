@@ -21,7 +21,7 @@
 
 (defn graph-attrs
   [options]
-  (d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)}))
+  {:rankdir (if (:vertical options) :TD :LR)})
 
 (def cli-help ["-h" "--help" "This usage summary."])
 

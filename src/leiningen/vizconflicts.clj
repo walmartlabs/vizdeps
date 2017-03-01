@@ -14,10 +14,11 @@
    to initialized project."
   [root-project]
   (reduce (fn [m module-name]
-            (assoc m module-name
-                   (-> (str module-name "/project.clj")
-                       project/read
-                       project/init-project)))
+            (main/info "Reading project" module-name)
+            (let [project (-> (str module-name "/project.clj")
+                              project/read
+                              project/init-project)]
+              (assoc m (:name project) project)))
           {}
           (:sub root-project)))
 
@@ -35,91 +36,69 @@
   [version->project-map]
   (-> version->project-map count (< 2)))
 
-(defn ^:private project-name->node [graph project-name]
-  (if-let [node-id (get-in graph [:project-node-ids project-name])]
-    [graph node-id]
-    (let [new-node-id (gen-graph-id project-name)
-          new-node {:label project-name
-                    :shape :doubleoctagon}]
-      [(-> graph
-           (assoc-in [:project-node-ids project-name] new-node-id)
-           (assoc-in [:nodes new-node-id] new-node))
-       new-node-id])))
-
-(defn ^:private add-version-edge
-  [graph project-node-id artifact-node-id version node-base]
-  (let [edge [project-node-id artifact-node-id (merge node-base
-                                                      {:label version})]]
-    (update graph :edges conj edge)))
-
-(defn ^:private to-label [sym]
-  (let [sym-ns (namespace sym)]
+(defn ^:private to-label [artifact-symbol version]
+  (let [sym-ns (namespace artifact-symbol)]
     (apply str sym-ns
            (when sym-ns
              "/\n")
-           (name sym))))
+           (name artifact-symbol)
+           "\n"
+           version)))
 
 (defn ^:private add-project-to-artifact-edges
   [graph artifact-symbol version->project-map]
-  (let [artifact-node-id (gen-graph-id artifact-symbol)
-        node-base (when (= artifact-symbol (:highlight graph))
-                    {:color :blue
-                     :fontcolor :blue})
-        artifact-node (merge node-base
-                             {:label (to-label artifact-symbol)})]
-    (reduce-kv (fn [g version project-names]
-                 (reduce (fn [g project-name]
-                           (let [[g' node-id] (project-name->node g project-name)]
-                             (add-version-edge g' node-id artifact-node-id version node-base)))
-                         g
-                         project-names))
-               (assoc-in graph [:nodes artifact-node-id] artifact-node)
-               version->project-map)))
+  (reduce-kv (fn [g-1 version project-names]
+               (let [artifact-node-id (gen-graph-id artifact-symbol)
+                     artifact-node {:label (to-label artifact-symbol version)}]
+                 (reduce (fn [g-2 project-name]
+                           (let [project-node-id (gen-graph-id project-name)
+                                 project-node {:label project-name
+                                               :shape :doubleoctagon}
+                                 edge [project-node-id artifact-node-id]]
+                             (-> g-2
+                                 (assoc-in [:nodes project-node-id] project-node)
+                                 (update :edges conj edge))))
+                         (assoc-in g-1 [:nodes artifact-node-id] artifact-node)
+                         project-names)))
+             graph
+             version->project-map))
 
-(defn ^:private conflicts-graph
-  [options artifact->versions-map]
-  (let [{:keys [highlight]} options
-        graph (-> {:nodes {}
-                   :project-node-ids {}
-                   :highlight (when highlight
-                                (symbol highlight))
-                   :edges []})]
-    (reduce-kv add-project-to-artifact-edges
-               graph
-               artifact->versions-map)))
 
 (defn ^:private node-graph
-  [options conflicts-graph]
-  (concat
-    [(common/graph-attrs options)]
-    (-> conflicts-graph :nodes seq)
-    (:edges conflicts-graph)))
+  [options artifact->versions-map]
+  (let [base-graph {:nodes {}
+                    :project-node-ids {}}]
+    (reduce-kv (fn [statements artifact-symbol version->project-map]
+                 (let [graph (add-project-to-artifact-edges base-graph artifact-symbol version->project-map)]
+                   (conj statements
+                         (d/subgraph (gen-graph-id :cluster)
+                                     [(merge (common/graph-attrs options)
+                                             {:label (str artifact-symbol)})
+                                      (-> graph :nodes seq)
+                                      (:edges graph)]))))
+               [{:rankdir :LR}]
+               artifact->versions-map)))
 
 
 (def ^:private cli-options
   [(common/cli-output-file "target/conflicts.pdf")
    common/cli-save-dot
    common/cli-no-view
-   common/cli-highlight
    common/cli-vertical
    common/cli-help])
 
 (defn vizconflicts
-  "Identify an visualize dependency conflicts across a multi-module project."
+  "Identify and visualize dependency conflicts across a multi-module project."
   {:pass-through-help true}
   [project & args]
   (when-let [options (common/parse-cli-options "vizconflicts" cli-options args)]
-    (let [dissoc-org-clojure (fn [m]
-                               (dissoc m 'org.clojure/clojure))
-          dot (->> project
+    (let [dot (->> project
                    projects-map
                    (map-vals common/flatten-dependencies)
                    ;; Reduce the inner maps to symbol -> version number string
                    (map-vals #(map-vals second %))
                    artifact-versions-map
-                   dissoc-org-clojure
                    (remove-vals no-conflicts?)
-                   (conflicts-graph options)
                    (node-graph options)
                    d/digraph
                    d/dot)]
