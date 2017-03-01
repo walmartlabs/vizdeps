@@ -15,7 +15,7 @@
   [root-project]
   (reduce (fn [m module-name]
             (assoc m module-name
-                   (-> (str "/Users/hlship/workspaces/sample/multiproject/" module-name "/project.clj")
+                   (-> (str module-name "/project.clj")
                        project/read
                        project/init-project)))
           {}
@@ -125,10 +125,3 @@
                    d/dot)]
       (common/write-files-and-view dot options)
       (main/info "Wrote conflicts chart to:" (:output-path options)))))
-
-(defn v [& args]
-  (let [project (-> "/Users/hlship/workspaces/sample/multiproject/project.clj"
-                    project/read
-                    project/init-project)]
-    (apply vizconflicts project args)))
-
