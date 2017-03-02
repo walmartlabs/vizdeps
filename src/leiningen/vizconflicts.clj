@@ -10,15 +10,17 @@
     [leiningen.core.main :as main]))
 
 (defn ^:private projects-map
-  "Generates a map from sub module name (string)
-   to initialized project."
+  "Generates a map from sub module name (a symbol) to initialized project."
   [root-project]
   (reduce (fn [m module-name]
             (main/info "Reading project" module-name)
             (let [project (-> (str module-name "/project.clj")
                               project/read
-                              project/init-project)]
-              (assoc m (:name project) project)))
+                              project/init-project)
+                  {project-name :name
+                   project-group :group} project
+                  artifact-symbol (symbol project-group project-name)]
+              (assoc m artifact-symbol project)))
           {}
           (:sub root-project)))
 
@@ -36,14 +38,17 @@
   [version->project-map]
   (-> version->project-map count (< 2)))
 
-(defn ^:private to-label [artifact-symbol version]
-  (let [sym-ns (namespace artifact-symbol)]
-    (apply str sym-ns
-           (when sym-ns
-             "/\n")
-           (name artifact-symbol)
-           "\n"
-           version)))
+(defn ^:private to-label
+  ([artifact-symbol]
+   (to-label artifact-symbol nil))
+  ([artifact-symbol version]
+   (let [sym-ns (namespace artifact-symbol)]
+     (apply str sym-ns
+            (when sym-ns
+              "/\n")
+            (name artifact-symbol)
+            (when version "\n")
+            version))))
 
 (defn ^:private direct-dependency?
   [projects project-name artifact-symbol]
@@ -51,33 +56,62 @@
           (= artifact-symbol (first dep)))
         (-> projects (get project-name) :dependencies)))
 
+(defn ^:private add-project-node
+  "Returns a tuple of graph and node id."
+  [graph project-name]
+  (if-let [node-id (get-in graph [:project-node-ids project-name])]
+    [graph node-id]
+    (let [new-node-id (gen-graph-id project-name)
+          project-node {:label (to-label project-name)
+                        :shape :doubleoctagon}
+          graph' (-> graph
+                     (assoc-in [:project-node-ids project-name] new-node-id)
+                     (assoc-in [:nodes new-node-id] project-node))]
+      [graph' new-node-id])))
+
 (defn ^:private add-project-to-artifact-edges
   [graph artifact-symbol version->project-map projects]
   (reduce-kv (fn [g-1 version project-names]
                (let [artifact-node-id (gen-graph-id artifact-symbol)
                      artifact-node {:label (to-label artifact-symbol version)}]
                  (reduce (fn [g-2 project-name]
-                           (let [project-node-id (gen-graph-id project-name)
-                                 project-node {:label project-name
-                                               :shape :doubleoctagon}
+                           (let [[graph' project-node-id] (add-project-node g-2 project-name)
                                  direct? (direct-dependency? projects project-name artifact-symbol)
                                  edge (cond-> [project-node-id artifact-node-id]
                                         (not direct?) (conj {:style :dotted}))]
-                             (-> g-2
-                                 (assoc-in [:nodes project-node-id] project-node)
-                                 (update :edges conj edge))))
+                             (update graph' :edges conj edge)))
                          (assoc-in g-1 [:nodes artifact-node-id] artifact-node)
                          project-names)))
              graph
              version->project-map))
 
+(defn ^:private add-project-to-project-edges
+  [graph version->project-map projects]
+  (let [{:keys [project-node-ids]} graph
+        involved-projects (into #{}
+                                (apply concat (vals version->project-map)))
+        project-dependencies (reduce (fn [m project-name]
+                                       (assoc m project-name
+                                              (into #{}
+                                                    (->> (get-in projects [project-name :dependencies])
+                                                         (map first)
+                                                         (keep involved-projects)))))
+                                     {}
+                                     involved-projects)
+        edges (for [[from-project-name dependencies] project-dependencies
+                    :let [from-node-id (get project-node-ids from-project-name)]
+                    to-project-name dependencies]
+                [from-node-id (get project-node-ids to-project-name)])]
+    (update graph :edges concat edges)))
 
 (defn ^:private node-graph
   [options projects artifact->versions-map]
   (let [base-graph {:nodes {}
                     :project-node-ids {}}]
     (reduce-kv (fn [statements artifact-symbol version->project-map]
-                 (let [graph (add-project-to-artifact-edges base-graph artifact-symbol version->project-map projects)]
+                 (let [graph (-> base-graph
+                                 (add-project-to-artifact-edges artifact-symbol version->project-map projects)
+                                 (add-project-to-project-edges version->project-map projects))]
                    (conj statements
                          (d/subgraph (gen-graph-id :cluster)
                                      [(merge (common/graph-attrs options)
