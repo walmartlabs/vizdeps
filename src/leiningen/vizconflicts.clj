@@ -113,7 +113,7 @@
                                  (add-project-to-artifact-edges artifact-symbol version->project-map projects)
                                  (add-project-to-project-edges version->project-map projects))]
                    (conj statements
-                         (d/subgraph (gen-graph-id :cluster)
+                         (d/subgraph (gen-graph-id (str "cluster_" (name artifact-symbol)))
                                      [(merge (common/graph-attrs options)
                                              {:label (str artifact-symbol)})
                                       (-> graph :nodes seq)
