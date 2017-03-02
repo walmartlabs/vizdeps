@@ -62,7 +62,7 @@
                                                :shape :doubleoctagon}
                                  direct? (direct-dependency? projects project-name artifact-symbol)
                                  edge (cond-> [project-node-id artifact-node-id]
-                                        direct? (conj {:style :dotted}))]
+                                        (not direct?) (conj {:style :dotted}))]
                              (-> g-2
                                  (assoc-in [:nodes project-node-id] project-node)
                                  (update :edges conj edge))))

@@ -110,7 +110,7 @@
   [project]
   "Resolves dependencies for the project and returns a map from artifact
   symbol to artifact coord vector."
-  (->> project
-       (classpath/dependency-hierarchy :dependencies)
-       build-dependency-map))
+  (-> (classpath/managed-dependency-hierarchy :dependencies :managed-dependencies
+                                              project)
+      build-dependency-map))
 

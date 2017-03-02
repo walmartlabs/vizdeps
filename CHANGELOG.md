@@ -1,3 +1,11 @@
+## 0.1.4 -- UNRELEASED
+
+Add support for :managed-dependencies.
+
+New task: vizconflicts, which iterates across the modules of a multi-module
+project, and creates a graph showing dependencies and versions for all
+artifact version conflicts.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.

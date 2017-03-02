@@ -19,7 +19,6 @@
          \newline
          version)))
 
-
 (defn ^:private add-edge
   [graph from-graph-id to-graph-id resolved-dependency version]
   (let [version-mismatch? (not= version (second resolved-dependency))
@@ -74,13 +73,18 @@
 
 (defn ^:private add-dependency-tree
   [graph project containing-node-id dependency]
+  (prn 'add-dependency-tree dependency)
   (let [[artifact version] dependency
         resolved-dependency (get-in graph [:dependencies artifact])
+        ;; When using managed dependencies, the version (from :dependencies) may be nil,
+        ;; so subtitute the version from the resolved dependency in that case.
+        version' (or version
+                     (second resolved-dependency))
         node-id (get-in graph [:node-ids artifact])]
     ;; When the node has been found from some other dependency,
     ;; just add a new edge to it.
     (if node-id
-      (add-edge graph containing-node-id node-id resolved-dependency version)
+      (add-edge graph containing-node-id node-id resolved-dependency version')
       ;; Otherwise its a new dependency in the graph and we want
       ;; to add the corresponding node and the edge to it,
       ;; but also take care of dependencies of the new node.
@@ -88,8 +92,8 @@
         (try
           (-> graph
               (assoc-in [:node-ids (first dependency)] sub-node-id)
-              (add-node artifact sub-node-id (dependency->label dependency))
-              (add-edge containing-node-id sub-node-id resolved-dependency version)
+              (add-node artifact sub-node-id (dependency->label resolved-dependency))
+              (add-edge containing-node-id sub-node-id resolved-dependency version')
               ;; Aether/Pomenegrate may reach a dependency by a differnt navigation of the
               ;; dependency tree, and so have a different version than the one for this
               ;; dependency, so always use the A/P resolved dependency (including version and
