@@ -45,8 +45,14 @@
            "\n"
            version)))
 
+(defn ^:private direct-dependency?
+  [projects project-name artifact-symbol]
+  (some (fn [dep]
+          (= artifact-symbol (first dep)))
+        (-> projects (get project-name) :dependencies)))
+
 (defn ^:private add-project-to-artifact-edges
-  [graph artifact-symbol version->project-map]
+  [graph artifact-symbol version->project-map projects]
   (reduce-kv (fn [g-1 version project-names]
                (let [artifact-node-id (gen-graph-id artifact-symbol)
                      artifact-node {:label (to-label artifact-symbol version)}]
@@ -54,7 +60,9 @@
                            (let [project-node-id (gen-graph-id project-name)
                                  project-node {:label project-name
                                                :shape :doubleoctagon}
-                                 edge [project-node-id artifact-node-id]]
+                                 direct? (direct-dependency? projects project-name artifact-symbol)
+                                 edge (cond-> [project-node-id artifact-node-id]
+                                        direct? (conj {:style :dotted}))]
                              (-> g-2
                                  (assoc-in [:nodes project-node-id] project-node)
                                  (update :edges conj edge))))
@@ -65,11 +73,11 @@
 
 
 (defn ^:private node-graph
-  [options artifact->versions-map]
+  [options projects artifact->versions-map]
   (let [base-graph {:nodes {}
                     :project-node-ids {}}]
     (reduce-kv (fn [statements artifact-symbol version->project-map]
-                 (let [graph (add-project-to-artifact-edges base-graph artifact-symbol version->project-map)]
+                 (let [graph (add-project-to-artifact-edges base-graph artifact-symbol version->project-map projects)]
                    (conj statements
                          (d/subgraph (gen-graph-id :cluster)
                                      [(merge (common/graph-attrs options)
@@ -92,14 +100,14 @@
   {:pass-through-help true}
   [project & args]
   (when-let [options (common/parse-cli-options "vizconflicts" cli-options args)]
-    (let [dot (->> project
-                   projects-map
+    (let [projects (projects-map project)
+          dot (->> projects
                    (map-vals common/flatten-dependencies)
                    ;; Reduce the inner maps to symbol -> version number string
                    (map-vals #(map-vals second %))
                    artifact-versions-map
                    (remove-vals no-conflicts?)
-                   (node-graph options)
+                   (node-graph options projects)
                    d/digraph
                    d/dot)]
       (common/write-files-and-view dot options)
