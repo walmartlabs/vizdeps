@@ -3,26 +3,35 @@
   (:require
     [com.walmartlabs.vizdeps.common :as common
      :refer [gen-graph-id]]
-    [medley.core :refer [map-vals remove-vals]]
+    [medley.core :refer [map-vals remove-vals filter-vals]]
     [clojure.pprint :refer [pprint]]
     [leiningen.core.project :as project]
     [dorothy.core :as d]
-    [leiningen.core.main :as main]))
+    [leiningen.core.main :as main]
+    [clojure.string :as str]))
 
 (defn ^:private projects-map
-  "Generates a map from sub module name (a symbol) to initialized project."
-  [root-project]
-  (reduce (fn [m module-name]
-            (main/info "Reading project" module-name)
-            (let [project (-> (str module-name "/project.clj")
-                              project/read
-                              project/init-project)
-                  {project-name :name
-                   project-group :group} project
-                  artifact-symbol (symbol project-group project-name)]
-              (assoc m artifact-symbol project)))
-          {}
-          (:sub root-project)))
+  "Generates a map from sub module name (a symbol) to initialized project.
+
+  The --omit option will prevent a module from being read at all, as if it were
+  not present. This can be useful to simplify the conflict diagram by omitting
+  modules that are used just for testing, for example."
+  [root-project options]
+  (let [{:keys [omit]} options
+        in-omit-list? (fn [module-name]
+                        (some #(str/includes? module-name %) omit))]
+    (reduce (fn [m module-name]
+              (main/info "Reading project" module-name)
+              (let [project (-> (str module-name "/project.clj")
+                                project/read
+                                project/init-project)
+                    {project-name :name
+                     project-group :group} project
+                    artifact-symbol (symbol project-group project-name)]
+                (assoc m artifact-symbol project)))
+            {}
+            (cond->> (:sub root-project)
+              (seq omit) (remove in-omit-list?)))))
 
 (defn ^:private artifact-versions-map
   [project->artifact->version-map]
@@ -70,15 +79,26 @@
       [graph' new-node-id])))
 
 (defn ^:private add-project-to-artifact-edges
-  [graph artifact-symbol version->project-map projects]
+  [graph artifact-symbol version->project-map projects majority-version]
   (reduce-kv (fn [g-1 version project-names]
                (let [artifact-node-id (gen-graph-id artifact-symbol)
-                     artifact-node {:label (to-label artifact-symbol version)}]
+                     majority? (and majority-version
+                                    (= version majority-version))
+                     minority? (and majority-version
+                                    (not= version majority-version))
+                     artifact-node (cond-> {:label (to-label artifact-symbol version)}
+                                     minority? (assoc :color :red
+                                                      :fontcolor :red)
+                                     majority? (assoc :color :blue
+                                                      :fontcolor :blue))]
                  (reduce (fn [g-2 project-name]
                            (let [[graph' project-node-id] (add-project-node g-2 project-name)
                                  direct? (direct-dependency? projects project-name artifact-symbol)
-                                 edge (cond-> [project-node-id artifact-node-id]
-                                        (not direct?) (conj {:style :dotted}))]
+                                 options (cond-> {}
+                                           (not direct?) (assoc :style :dotted)
+                                           minority? (assoc :color :red)
+                                           majority? (assoc :color :blue))
+                                 edge [project-node-id artifact-node-id options]]
                              (update graph' :edges conj edge)))
                          (assoc-in g-1 [:nodes artifact-node-id] artifact-node)
                          project-names)))
@@ -104,18 +124,46 @@
                 [from-node-id (get project-node-ids to-project-name)])]
     (update graph :edges concat edges)))
 
+(defn ^:private identify-majority-version
+  [version->project-map]
+  (let [counts (->> version->project-map
+                    vals
+                    (map count))
+        total-count (reduce + counts)
+        max-count (apply max counts)]
+    (when (< 0.5 (/ max-count total-count))
+      (->> version->project-map
+           (filter-vals #(-> % count (= max-count)))
+           keys
+           first))))
+
 (defn ^:private node-graph
   [options projects artifact->versions-map]
+  (when (empty? artifact->versions-map)
+    (main/info "No artifact version conflicts detected."))
   (let [base-graph {:nodes {}
                     :project-node-ids {}}]
     (reduce-kv (fn [statements artifact-symbol version->project-map]
-                 (let [graph (-> base-graph
-                                 (add-project-to-artifact-edges artifact-symbol version->project-map projects)
+                 (main/info (format "Artifact %s, %d versions: %s"
+                                    (str artifact-symbol)
+                                    (count version->project-map)
+                                    (->> version->project-map
+                                         keys
+                                         sort
+                                         (map pr-str)
+                                         (str/join ", ")) []))
+                 (let [majority-version (identify-majority-version version->project-map)
+                       graph (-> base-graph
+                                 (add-project-to-artifact-edges artifact-symbol version->project-map projects majority-version)
                                  (add-project-to-project-edges version->project-map projects))]
                    (conj statements
                          (d/subgraph (gen-graph-id (str "cluster_" (name artifact-symbol)))
                                      [(merge (common/graph-attrs options)
-                                             {:label (str artifact-symbol)})
+                                             {:label (str artifact-symbol \newline
+                                                          (->> version->project-map
+                                                               keys
+                                                               sort
+                                                               (str/join " -- ")))})
                                       (-> graph :nodes seq)
                                       (:edges graph)]))))
                [{:rankdir :LR}]
@@ -124,6 +172,8 @@
 
 (def ^:private cli-options
   [(common/cli-output-file "target/conflicts.pdf")
+   ["-O" "--omit NAME" "Omits any project whose name matches the value, may be repeated."
+    :assoc-fn (fn [m k v] (update m k conj v))]
    common/cli-save-dot
    common/cli-no-view
    common/cli-vertical
@@ -134,13 +184,14 @@
   {:pass-through-help true}
   [project & args]
   (when-let [options (common/parse-cli-options "vizconflicts" cli-options args)]
-    (let [projects (projects-map project)
+    (let [projects (projects-map project options)
           dot (->> projects
                    (map-vals common/flatten-dependencies)
                    ;; Reduce the inner maps to symbol -> version number string
                    (map-vals #(map-vals second %))
                    artifact-versions-map
                    (remove-vals no-conflicts?)
+                   (into (sorted-map))
                    (node-graph options projects)
                    d/digraph
                    d/dot)]
