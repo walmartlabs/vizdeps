@@ -73,7 +73,6 @@
 
 (defn ^:private add-dependency-tree
   [graph project containing-node-id dependency]
-  (prn 'add-dependency-tree dependency)
   (let [[artifact version] dependency
         resolved-dependency (get-in graph [:dependencies artifact])
         ;; When using managed dependencies, the version (from :dependencies) may be nil,
