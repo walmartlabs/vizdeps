@@ -10,6 +10,7 @@
 
 (defn ^:private dependency->label
   [dependency]
+  {:pre [dependency]}
   (let [[artifact-name version] dependency
         ^String group (some-> artifact-name namespace name)
         ^String module (name artifact-name)]
@@ -49,24 +50,16 @@
 (defn ^:private immediate-dependencies
   [project dependency]
   (if (some? dependency)
-    (try
-      (-> (#'classpath/get-dependencies-memoized
-            :dependencies nil
-            (assoc project :dependencies [dependency])
-            nil)
-          (get dependency)
-          ;; Tracking dependencies on Clojure itself overwhelms the graph
-          (as-> $
-                (remove #(= 'org.clojure/clojure (first %))
-                        $))
-          vec)
-      (catch Exception e
-        (throw (ex-info (format "Exception resolving dependencies of %s: %s"
-                                (pr-str dependency)
-                                (.getMessage e)
-                                )
-                        {:dependency dependency}
-                        e))))
+    (-> (#'classpath/get-dependencies-memoized
+          :dependencies nil
+          (assoc project :dependencies [dependency])
+          nil)
+        (get dependency)
+        ;; Tracking dependencies on Clojure itself overwhelms the graph
+        (as-> $
+              (remove #(= 'org.clojure/clojure (first %))
+                      $))
+        vec)
     []))
 
 (declare ^:private add-dependencies)
@@ -80,34 +73,34 @@
         version' (or version
                      (second resolved-dependency))
         node-id (get-in graph [:node-ids artifact])]
-    ;; When the node has been found from some other dependency,
-    ;; just add a new edge to it.
-    (if node-id
-      (add-edge graph containing-node-id node-id resolved-dependency version')
-      ;; Otherwise its a new dependency in the graph and we want
-      ;; to add the corresponding node and the edge to it,
-      ;; but also take care of dependencies of the new node.
-      (let [sub-node-id (-> dependency first gen-graph-id)]
-        (try
+    (main/debug (format "Processing %s %s"
+                        (str artifact) version'))
+    (if (nil? resolved-dependency)
+      (do
+        (main/debug "Skipping excluded artifact")
+        graph)
+      ;; When the node has been found from some other dependency,
+      ;; just add a new edge to it.
+      (if node-id
+        (add-edge graph containing-node-id node-id resolved-dependency version')
+        ;; Otherwise its a new dependency in the graph and we want
+        ;; to add the corresponding node and the edge to it,
+        ;; but also take care of dependencies of the new node.
+        (let [sub-node-id (-> dependency first gen-graph-id)]
           (-> graph
               (assoc-in [:node-ids (first dependency)] sub-node-id)
               (add-node artifact sub-node-id (dependency->label resolved-dependency))
               (add-edge containing-node-id sub-node-id resolved-dependency version')
-              ;; Aether/Pomenegrate may reach a dependency by a differnt navigation of the
+              ;; Aether/Pomenegrate may reach a dependency by a different navigation of the
               ;; dependency tree, and so have a different version than the one for this
               ;; dependency, so always use the A/P resolved dependency (including version and
               ;; exclusions) to compute transitive dependencies.
               (add-dependencies sub-node-id project
-                                (immediate-dependencies project resolved-dependency)))
-          (catch Exception e
-            (throw (ex-info (str "Exception processing dependencies of "
-                                 (pr-str resolved-dependency) ": "
-                                 (.getMessage e))
-                            {:dependency resolved-dependency}
-                            e))))))))
+                                (immediate-dependencies project resolved-dependency))))))))
 
 (defn ^:private add-dependencies
   [graph containing-node-id project dependencies]
+  (main/debug "Adding dependencies:" dependencies)
   (reduce (fn [g coord]
             (add-dependency-tree g project containing-node-id coord))
           graph
