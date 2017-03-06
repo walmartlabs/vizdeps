@@ -5,7 +5,8 @@
     [dorothy.core :as d]
     [clojure.java.browse :refer [browse-url]]
     [clojure.tools.cli :refer [parse-opts]]
-    [leiningen.core.classpath :as classpath])
+    [leiningen.core.classpath :as classpath]
+    [leiningen.core.main :as main])
   (:import (java.io File)))
 
 (defn gen-graph-id
@@ -85,6 +86,8 @@
             dot-path (str (subs output-path 0 x) ".dot")
             ^File dot-file (io/file dot-path)]
         (spit dot-file dot)))
+
+    (main/debug "Create output diagram")
 
     (d/save! dot output-file {:format output-format})
 
