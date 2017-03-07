@@ -39,9 +39,12 @@ Options:
   -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue.
   -v, --vertical                                     Use a vertical, not horizontal, layout.
   -d, --dev                                          Include :dev dependencies in the graph.
+  -p, --prune                                        Exclude artifacts and dependencies that do not involve version conflicts.
   -h, --help                                         This usage summary.
 ```
-  
+
+The --highlight option can be repeated; any artifact that contains any of the provided strings will be highlighted.
+
 ## License
 
 Copyright © 2016-2017 Walmartlabs
