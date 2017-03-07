@@ -12,10 +12,12 @@ for which a version conflict exists, and removes from the diagram
 any artifacts that do not have version conflicts, or transitively depend
 on artifacts with version conflicts.
 
+The -H / --highlight option now supports multiple values.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.
-Add --highlight option to highlight an artifact and dependencies to it, in blue.
+Added -H / --highlight option to highlight an artifact and dependencies to it, in blue.
 
 ## 0.1.2 -- 17 Feb 2017
 

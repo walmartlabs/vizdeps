@@ -173,7 +173,7 @@
 (def ^:private cli-options
   [(common/cli-output-file "target/conflicts.pdf")
    ["-O" "--omit NAME" "Omits any project whose name matches the value, may be repeated."
-    :assoc-fn (fn [m k v] (update m k conj v))]
+    :assoc-fn common/conj-option]
    common/cli-save-dot
    common/cli-no-view
    common/cli-vertical

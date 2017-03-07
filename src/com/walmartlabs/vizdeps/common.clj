@@ -39,11 +39,13 @@
    :default default-path
    :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]])
 
-(def cli-highlight
-  ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."])
-
 (def cli-vertical
   ["-v" "--vertical" "Use a vertical, not horizontal, layout."])
+
+(defn conj-option
+  "Used as :assoc-fn for an option to conj'es the values together."
+  [m k v]
+  (update m k conj v))
 
 (defn ^:private usage
   [command summary errors]

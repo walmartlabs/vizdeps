@@ -185,8 +185,9 @@
 
   Each :dep has keys :artifact-name, :version, :conflict?, and :highlight?."
   [project options]
-  (let [include-dev (:dev options)
-        profiles (if-not include-dev [:user] [:user :dev])
+  (let [profiles (if-not (:dev options)
+                   [:user]
+                   [:user :dev])
         project' (project/set-profiles project profiles)
         root-artifact-name (symbol (-> project :group str) (-> project :name str))
         root-dependency [root-artifact-name (:version project)]
@@ -205,9 +206,11 @@
         ;; Ensure the root artifact is drawn properly and never pruned
         (assoc-in [root-artifact-name :root?] true)
         (cond->
-          (:prune options) prune-artifacts
-          ;; TODO: Support multiple highlight terms
-          (:highlight options) (highlight-artifacts [(:highlight options)])))))
+          (:prune options)
+          prune-artifacts
+
+          (-> options :highlight seq)
+          (highlight-artifacts (:highlight options))))))
 
 (defn ^:private node-graph
   [artifacts options]
@@ -249,7 +252,8 @@
   [(common/cli-output-file "target/dependencies.pdf")
    common/cli-save-dot
    common/cli-no-view
-   common/cli-highlight
+   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."
+    :assoc-fn common/conj-option]
    common/cli-vertical
    ["-d" "--dev" "Include :dev dependencies in the graph."]
    ["-p" "--prune" "Exclude artifacts and dependencies that do not involve version conflicts."]
