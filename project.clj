@@ -5,5 +5,6 @@
             :url  "http://www.apache.org/licenses/LICENSE-2.0.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [dorothy "0.0.6"]
-                 [medley "0.8.4"]]
+                 [medley "0.8.4"]
+                 [com.stuartsierra/dependency "0.2.0"]]
   :eval-in-leiningen true)

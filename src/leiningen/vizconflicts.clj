@@ -2,7 +2,7 @@
   "Graphviz visualization of conflicts in a multi-module project."
   (:require
     [com.walmartlabs.vizdeps.common :as common
-     :refer [gen-graph-id]]
+     :refer [gen-node-id]]
     [medley.core :refer [map-vals remove-vals filter-vals]]
     [clojure.pprint :refer [pprint]]
     [leiningen.core.project :as project]
@@ -70,7 +70,7 @@
   [graph project-name]
   (if-let [node-id (get-in graph [:project-node-ids project-name])]
     [graph node-id]
-    (let [new-node-id (gen-graph-id project-name)
+    (let [new-node-id (gen-node-id project-name)
           project-node {:label (to-label project-name)
                         :shape :doubleoctagon}
           graph' (-> graph
@@ -81,7 +81,7 @@
 (defn ^:private add-project-to-artifact-edges
   [graph artifact-symbol version->project-map projects majority-version]
   (reduce-kv (fn [g-1 version project-names]
-               (let [artifact-node-id (gen-graph-id artifact-symbol)
+               (let [artifact-node-id (gen-node-id artifact-symbol)
                      majority? (and majority-version
                                     (= version majority-version))
                      minority? (and majority-version
@@ -157,7 +157,7 @@
                                  (add-project-to-artifact-edges artifact-symbol version->project-map projects majority-version)
                                  (add-project-to-project-edges version->project-map projects))]
                    (conj statements
-                         (d/subgraph (gen-graph-id (str "cluster_" (name artifact-symbol)))
+                         (d/subgraph (gen-node-id (str "cluster_" (name artifact-symbol)))
                                      [(merge (common/graph-attrs options)
                                              {:label (str artifact-symbol \newline
                                                           (->> version->project-map

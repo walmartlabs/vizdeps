@@ -6,6 +6,12 @@ New task: vizconflicts, which iterates across the modules of a multi-module
 project, and creates a graph showing dependencies and versions for all
 artifact version conflicts.
 
+The vizdeps task now accepts the -p / --purge option, which is used
+when investigating version conflicts; --purge identifies all artifacts
+for which a version conflict exists, and removes from the diagram
+any artifacts that do not have version conflicts, or transitively depend
+on artifacts with version conflicts.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.

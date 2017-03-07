@@ -9,7 +9,7 @@
     [leiningen.core.main :as main])
   (:import (java.io File)))
 
-(defn gen-graph-id
+(defn gen-node-id
   "Create a unique string, based on the provided node-name (keyword, symbol, or string)."
   [node-name]
   (str (gensym (str (name node-name) "-"))))
