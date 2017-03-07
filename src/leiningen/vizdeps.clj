@@ -225,6 +225,7 @@
 
          (:highlight? artifact)
          (assoc :color :blue
+                :penwidth 2
                 :fontcolor :blue))])
 
     ;; Now, all edges:
@@ -236,10 +237,12 @@
        (cond-> {}
          (:highlight? dep)
          (assoc :color :blue
+                :penwidth 2
                 :weight 100)
 
          (:conflict? dep)
          (assoc :color :red
+                :penwidth 2
                 :weight 500
                 :label (:version dep)))])))
 

@@ -19,6 +19,9 @@ and version conflict (red) edges are even higher weight. Higher weight
 lines are generally straighter, with other nodes and edges moved out of
 the way. This improves clarity of complex dependency charts.
 
+In addition, highlight and version conflict edges are drawn slightly thicker,
+as are highlighted nodes.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.
