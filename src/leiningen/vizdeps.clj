@@ -235,10 +235,12 @@
        (get-in artifacts [(:artifact-name dep) :node-id])
        (cond-> {}
          (:highlight? dep)
-         (assoc :color :blue)
+         (assoc :color :blue
+                :weight 100)
 
          (:conflict? dep)
          (assoc :color :red
+                :weight 500
                 :label (:version dep)))])))
 
 (defn ^:private build-dot

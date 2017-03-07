@@ -14,6 +14,11 @@ on artifacts with version conflicts.
 
 The -H / --highlight option now supports multiple values.
 
+Edges are now weighted; highlighted (blue) edges are higher weight than normal,
+and version conflict (red) edges are even higher weight. Higher weight
+lines are generally straighter, with other nodes and edges moved out of
+the way. This improves clarity of complex dependency charts.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.
