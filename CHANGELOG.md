@@ -1,4 +1,6 @@
-## 0.1.4 -- UNRELEASED
+## 0.1.4 -- 8 Mar 2017
+
+[Closed Issues](https://github.com/walmartlabs/vizdeps/milestone/1?closed=1)
 
 Add support for :managed-dependencies.
 
