@@ -30,12 +30,21 @@ transitively depend on an artifact with such a conflict:
 
 ![rook-purged](images/rook-pruned.png)
 
-## Usage
+## Installation
 
 Put `[walmartlabs/vizdeps "0.1.4"]` into the `:plugins` vector of your `:user`
 profile.
 
-### vizdeps task
+The plugin makes use of the `dot` command,part of Graphviz,
+which must be installed.
+On OS X, Graphviz can be installed using [Homebrew](https://brew.sh/):
+
+    brew install graphviz
+
+On other platforms, Graphviz can be [downloaded](http://www.graphviz.org/Download.php).
+
+
+## vizdeps task
 
 ```
 Usage: lein vizdeps [options]
