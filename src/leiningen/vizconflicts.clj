@@ -13,13 +13,11 @@
 (defn ^:private projects-map
   "Generates a map from sub module name (a symbol) to initialized project.
 
-  The --omit option will prevent a module from being read at all, as if it were
+  The --exclude option will prevent a module from being read at all, as if it were
   not present. This can be useful to simplify the conflict diagram by omitting
   modules that are used just for testing, for example."
   [root-project options]
-  (let [{:keys [omit]} options
-        in-omit-list? (fn [module-name]
-                        (some #(str/includes? module-name %) omit))]
+  (let [{:keys [exclude]} options]
     (reduce (fn [m module-name]
               (main/info "Reading project" module-name)
               (let [project (-> (str module-name "/project.clj")
@@ -31,7 +29,7 @@
                 (assoc m artifact-symbol project)))
             {}
             (cond->> (:sub root-project)
-              (seq omit) (remove in-omit-list?)))))
+              (seq exclude) (remove (common/matches-any exclude))))))
 
 (defn ^:private artifact-versions-map
   [project->artifact->version-map]
@@ -172,11 +170,10 @@
 
 (def ^:private cli-options
   [(common/cli-output-file "target/conflicts.pdf")
-   ["-O" "--omit NAME" "Omits any project whose name matches the value, may be repeated."
+   ["-X" "--exclude NAME" "Exclude any project whose name matches the value. Repeatable."
     :assoc-fn common/conj-option]
    common/cli-save-dot
    common/cli-no-view
-   common/cli-vertical
    common/cli-help])
 
 (defn vizconflicts

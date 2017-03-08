@@ -119,3 +119,10 @@
                                               project)
       build-dependency-map))
 
+(defn matches-any
+  "Creates a predicate that is true when the provided elem (string, symbol, keyword)
+  matches any of the provided string names."
+  [names]
+  (fn [elem]
+    (let [elem-name (name elem)]
+      (some #(str/includes? elem-name %) names))))

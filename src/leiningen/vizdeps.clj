@@ -156,19 +156,18 @@
 
 (defn ^:private highlight-artifacts
   [artifacts highlight-terms]
-  (let [highlight? (fn [artifact-name]
-                     (some #(str/includes? (name artifact-name) %)
-                           highlight-terms))
+  (let [highlight-set (->> artifacts
+                           keys
+                           (filter (common/matches-any highlight-terms))
+                           set)
         artifacts-highlighted (reduce (fn [m artifact-name]
                                         (assoc-in m [artifact-name :highlight?] true))
                                       artifacts
-                                      (->> artifacts
-                                           keys
-                                           (filter highlight?)))
+                                      highlight-set)
         ;; Now, find dependencies that target highlighted artifacts
         ;; and mark them as highlighted as well.
         add-highlight (fn [dep]
-                        (if (get-in artifacts-highlighted [(:artifact-name dep) :highlight?])
+                        (if (-> dep :artifact-name highlight-set)
                           (assoc dep :highlight? true)
                           dep))]
     (reduce-kv (fn [artifacts-3 artifact-name artifact]
@@ -257,7 +256,7 @@
   [(common/cli-output-file "target/dependencies.pdf")
    common/cli-save-dot
    common/cli-no-view
-   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."
+   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue. Repeatable."
     :assoc-fn common/conj-option]
    common/cli-vertical
    ["-d" "--dev" "Include :dev dependencies in the graph."]
