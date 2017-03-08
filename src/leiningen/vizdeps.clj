@@ -1,19 +1,19 @@
 (ns leiningen.vizdeps
   "Graphviz visualization of project dependencies."
-  (:require [leiningen.core.main :as main]
-            [clojure.tools.cli :refer [parse-opts]]
-            [dorothy.core :as d]
-            [clojure.java.browse :refer [browse-url]]
-            [leiningen.core.classpath :as classpath]
-            [leiningen.core.project :as project]
-            [clojure.string :as str]
-            [clojure.java.io :as io])
-  (:import [java.io File]))
+  (:require
+    [com.walmartlabs.vizdeps.common :as common
+     :refer [gen-node-id]]
+    [com.stuartsierra.dependency :as dep]
+    [leiningen.core.main :as main]
+    [dorothy.core :as d]
+    [leiningen.core.classpath :as classpath]
+    [leiningen.core.project :as project]
+    [clojure.string :as str]))
 
-
-(defn ^:private dependency->label
-  [dependency]
-  (let [[artifact-name version] dependency
+(defn ^:private artifact->label
+  [artifact]
+  {:pre [artifact]}
+  (let [{:keys [artifact-name version]} artifact
         ^String group (some-> artifact-name namespace name)
         ^String module (name artifact-name)]
     (str group
@@ -21,30 +21,6 @@
          module
          \newline
          version)))
-
-(defn ^:private gen-graph-id
-  [k]
-  (str (gensym (str (name k) "-"))))
-
-(defn ^:private add-edge
-  [graph from-graph-id to-graph-id resolved-dependency version]
-  (let [version-mismatch? (not= version (second resolved-dependency))
-        highlight? (= (:highlight graph) (first resolved-dependency))
-        edge-attrs (cond-> nil
-                     highlight? (assoc :color :blue)
-                     version-mismatch? (assoc :color :red :label version))
-        edge (cond-> [from-graph-id to-graph-id]
-               edge-attrs (conj edge-attrs))]
-    (update graph :edges conj edge)))
-
-(defn ^:private add-node
-  [graph artifact node-id attributes]
-  (let [highlight? (= (:highlight graph) artifact)
-        node-attrs (cond-> (if (string? attributes)
-                             {:label attributes}
-                             attributes)
-                     highlight? (assoc :color :blue))]
-    (assoc-in graph [:nodes node-id] node-attrs)))
 
 (defn ^:private normalize-artifact
   [dependency]
@@ -56,152 +32,236 @@
 (defn ^:private immediate-dependencies
   [project dependency]
   (if (some? dependency)
-    (try
-      (-> (#'classpath/get-dependencies-memoized
-            :dependencies nil
-            (assoc project :dependencies [dependency])
-            nil)
-          (get dependency)
-          ;; Tracking dependencies on Clojure itself overwhelms the graph
-          (as-> $
-                (remove #(= 'org.clojure/clojure (first %))
-                        $))
-          vec)
-      (catch Exception e
-        (throw (ex-info (format "Exception resolving dependencies of %s: %s"
-                                (pr-str dependency)
-                                (.getMessage e)
-                                )
-                        {:dependency dependency}
-                        e))))
+    (-> (#'classpath/get-dependencies-memoized
+          :dependencies nil
+          (assoc project :dependencies [dependency])
+          nil)
+        (get dependency)
+        ;; Tracking dependencies on Clojure itself overwhelms the graph
+        (as-> $
+              (remove #(= 'org.clojure/clojure (first %))
+                      $))
+        vec)
     []))
 
-(declare ^:private add-dependencies)
+(declare ^:private add-dependency-tree)
 
-(defn ^:private add-dependency-tree
-  [graph project containing-node-id dependency]
-  (let [[artifact version] dependency
-        resolved-dependency (get-in graph [:dependencies artifact])
-        node-id (get-in graph [:node-ids artifact])]
-    ;; When the node has been found from some other dependency,
-    ;; just add a new edge to it.
-    (if node-id
-      (add-edge graph containing-node-id node-id resolved-dependency version)
-      ;; Otherwise its a new dependency in the graph and we want
-      ;; to add the corresponding node and the edge to it,
-      ;; but also take care of dependencies of the new node.
-      (let [sub-node-id (-> dependency first gen-graph-id)]
-        (try
-          (-> graph
-              (assoc-in [:node-ids (first dependency)] sub-node-id)
-              (add-node artifact sub-node-id (dependency->label dependency))
-              (add-edge containing-node-id sub-node-id resolved-dependency version)
-              ;; Aether/Pomenegrate may reach a dependency by a differnt navigation of the
-              ;; dependency tree, and so have a different version than the one for this
-              ;; dependency, so always use the A/P resolved dependency (including version and
-              ;; exclusions) to compute transitive dependencies.
-              (add-dependencies sub-node-id project
-                                (immediate-dependencies project resolved-dependency)))
-          (catch Exception e
-            (throw (ex-info (str "Exception processing dependencies of "
-                                 (pr-str resolved-dependency) ": "
-                                 (.getMessage e))
-                            {:dependency resolved-dependency}
-                            e))))))))
-
-(defn ^:private add-dependencies
-  [graph containing-node-id project dependencies]
-  (reduce (fn [g coord]
-            (add-dependency-tree g project containing-node-id coord))
-          graph
+(defn ^:private add-dependency-node
+  [dependency-graph artifact-name artifact-version dependencies]
+  (reduce (fn [g dep]
+            (let [[dep-name dep-version] dep
+                  g-1 (add-dependency-tree g dep-name dep-version)]
+              (if-let [dep-artifact (get-in g-1 [:artifacts dep-name])]
+                (let [dep-map {:artifact-name dep-name
+                               :version dep-version
+                               :conflict? (not= dep-version
+                                                (:version dep-artifact))}]
+                  (update-in g-1 [:artifacts artifact-name :deps] conj dep-map))
+                ;; If the artifact is excluded, the dependency graph will
+                ;; not contain the artifact.
+                g-1)))
+          ;; Start with a new node for the artifact
+          (assoc-in dependency-graph
+                    [:artifacts artifact-name]
+                    {:artifact-name artifact-name
+                     :version artifact-version
+                     :node-id (gen-node-id artifact-name)
+                     :deps []})
           dependencies))
 
-(defn ^:private build-dependency-map
-  "Consumes a hierarchy and produces a map from artifact to version, used to identify
-  which dependency linkages have had their version changed."
-  ([hierarchy]
-   (build-dependency-map {} hierarchy))
-  ([version-map hierarchy]
-   (reduce-kv (fn [m dep sub-hierarchy]
-                (-> m
-                    (assoc (first dep) dep)
-                    (build-dependency-map sub-hierarchy)))
-              version-map
-              hierarchy)))
+(defn ^:private add-dependency-tree
+  [dependency-graph artifact-name artifact-version]
+  (let [[_ resolved-version :as resolved-dependency] (get-in dependency-graph [:dependencies artifact-name])
+        ;; When using managed dependencies, the version (from :dependencies) may be nil,
+        ;; so subtitute the version from the resolved dependency in that case.
+        version (or artifact-version resolved-version)
+        artifact (get-in dependency-graph [:artifacts artifact-name])]
+    (main/debug (format "Processing %s %s"
+                        (str artifact-name) version))
 
-(defn ^:private dependency-graph
-  "Builds out a structured dependency graph, from which a Dorothy node graph can be constructed."
-  [project include-dev highlight-artifact]
-  (let [profiles (if-not include-dev [:user] [:user :dev])
+    (cond
+
+      (nil? resolved-dependency)
+      (do
+        (main/debug "Skipping excluded artifact")
+        dependency-graph)
+
+      ;; Has the artifact already been added?
+      (some? artifact)
+      dependency-graph
+
+      :else
+      (add-dependency-node dependency-graph
+                           artifact-name
+                           resolved-version
+                           ;; Find the dependencies of the resolved (not requested) artifact
+                           ;; and version. Recursively add those artifacts to the graph
+                           ;; and set up dependencies.
+                           (immediate-dependencies (:project dependency-graph)
+                                                   resolved-dependency)))))
+
+(defn ^:private prune-artifacts
+  "Navigates the nodes to identify dependencies that include conflicts.
+  Marks nodes that are referenced with conflicts, then marks any nodes that
+  have a dependency to that node as well. The root node is always kept;
+  other unmarked nodes are culled."
+  [artifacts]
+  (main/debug "Pruning artifacts")
+  (let [tuples (for [artifact (vals artifacts)
+                     dep (:deps artifact)]
+                 [(:artifact-name artifact)
+                  (:artifact-name dep)])
+        graph (reduce (fn [g [artifact-name dependency-name]]
+                        (dep/depend g artifact-name dependency-name))
+                      (dep/graph)
+                      tuples)
+        order (dep/topo-sort graph)
+        mark-graph (fn [artifacts artifact-name]
+                     (assoc-in artifacts [artifact-name :conflict?] true))
+        get-transitives (fn [artifacts artifact]
+                          (->> artifact
+                               :deps
+                               (filter #(->> %
+                                             :artifact-name
+                                             artifacts
+                                             ;; May be nil here, when an earlier processed artifact
+                                             ;; was culled.  Otherwise, check if the :conflict? flag
+                                             ;; was set on the artifact.
+                                             :conflict?))))
+        marked-graph (reduce (fn [artifacts-1 artifact-name]
+                               (->> (artifacts-1 artifact-name)
+                                    :deps
+                                    (filter :conflict?)
+                                    (map :artifact-name)
+                                    (reduce mark-graph artifacts-1)))
+                             artifacts
+                             order)]
+    (reduce (fn [artifacts-1 artifact-name]
+              (let [artifact (artifacts-1 artifact-name)
+                    ;; Get transitive dependencies to conflict artifacts (dropping
+                    ;; dependencies to non-conflict artifacts, if any).
+                    transitives (get-transitives artifacts-1 artifact)
+                    keep? (or (:conflict? artifact)
+                              (:root? artifact)
+                              (seq transitives))]
+                (if keep?
+                  (assoc artifacts-1 artifact-name
+                         (assoc artifact
+                                :conflict? true
+                                :deps transitives))
+                  ;; Otherwise we don't need this artifact at all
+                  (dissoc artifacts-1 artifact-name))))
+            marked-graph
+            order)))
+
+(defn ^:private highlight-artifacts
+  [artifacts highlight-terms]
+  (let [highlight-set (->> artifacts
+                           keys
+                           (filter (common/matches-any highlight-terms))
+                           set)
+        artifacts-highlighted (reduce (fn [m artifact-name]
+                                        (assoc-in m [artifact-name :highlight?] true))
+                                      artifacts
+                                      highlight-set)
+        ;; Now, find dependencies that target highlighted artifacts
+        ;; and mark them as highlighted as well.
+        add-highlight (fn [dep]
+                        (if (-> dep :artifact-name highlight-set)
+                          (assoc dep :highlight? true)
+                          dep))]
+    (reduce-kv (fn [artifacts-3 artifact-name artifact]
+                 (assoc artifacts-3 artifact-name
+                        (update artifact :deps
+                                #(map add-highlight %))))
+               {}
+               artifacts-highlighted)))
+
+(defn ^:private artifacts-map
+  "Builds a map from artifact name (symbol) to an artifact record, with keys
+  :artifact-name, :version, :node-id, :highlight?, :conflict?, :root? and
+  :deps.
+
+  Each :dep has keys :artifact-name, :version, :conflict?, and :highlight?."
+  [project options]
+  (let [profiles (if-not (:dev options)
+                   [:user]
+                   [:user :dev])
         project' (project/set-profiles project profiles)
-        root-dependency [(symbol (-> project :group str) (-> project :name str)) (:version project)]
-        dependency-map (->> project'                        ;
-                            (classpath/dependency-hierarchy :dependencies)
-                            build-dependency-map)]
-    ;; :nodes - map from node graph id to node attributes
-    ;; :edges - list of edge tuples [from graph id, to graph id]
-    ;; :sets - map from set id (a keyword or a symbol, typically) to a generated node graph id (a symbol)
-    ;; :node-ids - map from artifact symbol (e.g., com.walmartlab/shared-deps) to a generated node graph id
-    ;; :dependencies - map from artifact symbol to version number, as supplied by Leiningen
-    (add-dependencies {:nodes {:root {:label (dependency->label root-dependency)
-                                      :shape :doubleoctagon}}
-                       :edges []
-                       :sets {}
-                       :node-ids {}
-                       :highlight (when highlight-artifact
-                                    (symbol highlight-artifact))
-                       :dependencies dependency-map}
-                      :root
-                      project'
-                      (->> project'
-                           :dependencies
-                           (map normalize-artifact)))))
+        root-artifact-name (symbol (-> project :group str) (-> project :name str))
+        root-dependency [root-artifact-name (:version project)]
+        dependency-map (common/flatten-dependencies project')
+        root-dependencies (->> project'
+                               :dependencies
+                               (map normalize-artifact))]
+    (-> (add-dependency-node {:artifacts {}
+                              :project project
+                              :dependencies dependency-map}
+                             root-artifact-name
+                             (:version project)
+                             root-dependencies)
+        ;; Just need the artifacts from here out
+        :artifacts
+        ;; Ensure the root artifact is drawn properly and never pruned
+        (assoc-in [root-artifact-name :root?] true)
+        (cond->
+          (:prune options)
+          prune-artifacts
+
+          (-> options :highlight seq)
+          (highlight-artifacts (:highlight options))))))
 
 (defn ^:private node-graph
-  [dependency-graph options]
+  [artifacts options]
   (concat
-    [(d/graph-attrs {:rankdir (if (:vertical options) :TD :LR)})]
-    (for [[k v] (:nodes dependency-graph)]
-      [k v])
-    (:edges dependency-graph)))
+    [(d/graph-attrs (common/graph-attrs options))]
+    ;; All nodes:
+    (for [artifact (vals artifacts)]
+      [(:node-id artifact)
+       (cond-> {:label (artifact->label artifact)}
+         (:root? artifact)
+         (assoc :shape :doubleoctagon)
+
+         (:highlight? artifact)
+         (assoc :color :blue
+                :penwidth 2
+                :fontcolor :blue))])
+
+    ;; Now, all edges:
+    (for [artifact (vals artifacts)
+          :let [node-id (:node-id artifact)]
+          dep (:deps artifact)]
+      [node-id
+       (get-in artifacts [(:artifact-name dep) :node-id])
+       (cond-> {}
+         (:highlight? dep)
+         (assoc :color :blue
+                :penwidth 2
+                :weight 100)
+
+         (:conflict? dep)
+         (assoc :color :red
+                :penwidth 2
+                :weight 500
+                :label (:version dep)))])))
 
 (defn ^:private build-dot
   [project options]
-  (-> (dependency-graph project (:dev options) (:highlight options))
+  (-> (artifacts-map project options)
       (node-graph options)
       d/digraph
       d/dot))
 
-(defn ^:private allowed-extension
-  [path]
-  (let [x (str/last-index-of path ".")
-        ext (subs path (inc x))]
-    (#{"png" "pdf"} ext)))
-
 (def ^:private cli-options
-  [["-o" "--output-file FILE" "Output file path. Extension chooses format: pdf or png."
-    :id :output-path
-    :default "target/dependencies.pdf"
-    :validate [allowed-extension "Supported output formats are 'pdf' and 'png'."]]
-   ["-s" "--save-dot" "Save the generated GraphViz DOT file well as the output file."]
-   ["-n" "--no-view" "If given, the image will not be opened after creation."
-    :default false]
-   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue."]
-   ["-v" "--vertical" "Use a vertical, not horizontal, layout."]
+  [(common/cli-output-file "target/dependencies.pdf")
+   common/cli-save-dot
+   common/cli-no-view
+   ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue. Repeatable."
+    :assoc-fn common/conj-option]
+   common/cli-vertical
    ["-d" "--dev" "Include :dev dependencies in the graph."]
-   ["-h" "--help" "This usage summary."]])
-
-(defn ^:private usage [summary errors]
-  (let [main (->> ["Usage: lein vizdeps [options]"
-                   ""
-                   "Options:"
-                   summary]
-                  (str/join \newline))]
-    (println main)
-
-    (when errors
-      (println "\nErrors:")
-      (doseq [e errors] (println " " e)))))
+   ["-p" "--prune" "Exclude artifacts and dependencies that do not involve version conflicts."]
+   common/cli-help])
 
 (defn vizdeps
   "Visualizes dependencies using Graphviz.
@@ -210,29 +270,7 @@
   Command line options allow the image to be written to a file instead."
   {:pass-through-help true}
   [project & args]
-  (let [{:keys [options errors summary]} (parse-opts args cli-options)]
-
-    (if (or (:help options) errors)
-      (usage summary errors)
-      (let [{:keys [output-path no-view]} options
-            output-format (-> output-path allowed-extension keyword)
-            ^File output-file (io/file output-path)
-            output-dir (.getParentFile output-file)]
-
-        (when output-dir
-          (.mkdirs output-dir))
-
-        (let [dot (build-dot project options)]
-
-          (when (:save-dot options)
-            (let [x (str/last-index-of output-path ".")
-                  dot-path (str (subs output-path 0 x) ".dot")
-                  ^File dot-file (io/file dot-path)]
-              (spit dot-file dot)))
-
-          (d/save! dot output-file {:format output-format})
-
-          (main/info "Wrote dependency chart to:" output-path))
-
-        (when-not no-view
-          (browse-url output-path))))))
+  (when-let [options (common/parse-cli-options "vizdeps" cli-options args)]
+    (let [dot (build-dot project options)]
+      (common/write-files-and-view dot options)
+      (main/info "Wrote dependency chart to:" (:output-path options)))))

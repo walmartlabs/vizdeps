@@ -1,7 +1,31 @@
+## 0.1.4 -- UNRELEASED
+
+Add support for :managed-dependencies.
+
+New task: vizconflicts, which iterates across the modules of a multi-module
+project, and creates a graph showing dependencies and versions for all
+artifact version conflicts.
+
+The vizdeps task now accepts the -p / --purge option, which is used
+when investigating version conflicts; --purge identifies all artifacts
+for which a version conflict exists, and removes from the diagram
+any artifacts that do not have version conflicts, or transitively depend
+on artifacts with version conflicts.
+
+The -H / --highlight option now supports multiple values.
+
+Edges are now weighted; highlighted (blue) edges are higher weight than normal,
+and version conflict (red) edges are even higher weight. Higher weight
+lines are generally straighter, with other nodes and edges moved out of
+the way. This improves clarity of complex dependency charts.
+
+In addition, highlight and version conflict edges are drawn slightly thicker,
+as are highlighted nodes.
+
 ## 0.1.3 -- 24 Feb 2017
 
 Group, module, and version each on their own line.
-Add --highlight option to highlight an artifact and dependencies to it, in blue.
+Added -H / --highlight option to highlight an artifact and dependencies to it, in blue.
 
 ## 0.1.2 -- 17 Feb 2017
 
