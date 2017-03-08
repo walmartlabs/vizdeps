@@ -3,7 +3,7 @@
   (:require
     [com.walmartlabs.vizdeps.common :as common
      :refer [gen-node-id]]
-    [medley.core :refer [map-vals remove-vals filter-vals]]
+    [medley.core :refer [map-vals remove-vals filter-vals filter-keys]]
     [clojure.pprint :refer [pprint]]
     [leiningen.core.project :as project]
     [dorothy.core :as d]
@@ -32,14 +32,17 @@
               (seq exclude) (remove (common/matches-any exclude))))))
 
 (defn ^:private artifact-versions-map
-  [project->artifact->version-map]
-  (reduce-kv (fn [m project-name artifact-versions]
-               (reduce-kv (fn [m artifact-name artifact-version]
-                            (update-in m [artifact-name artifact-version] conj project-name))
-                          m
-                          artifact-versions))
-             {}
-             project->artifact->version-map))
+  [options project->artifact->version-map]
+  (let [{:keys [artifact]} options
+        result (reduce-kv (fn [m project-name artifact-versions]
+                            (reduce-kv (fn [m artifact-name artifact-version]
+                                         (update-in m [artifact-name artifact-version] conj project-name))
+                                       m
+                                       artifact-versions))
+                          {}
+                          project->artifact->version-map)]
+    (cond->> result
+      (seq artifact) (filter-keys (common/matches-any artifact)))))
 
 (defn ^:private no-conflicts?
   [version->project-map]
@@ -172,6 +175,8 @@
   [(common/cli-output-file "target/conflicts.pdf")
    ["-X" "--exclude NAME" "Exclude any project whose name matches the value. Repeatable."
     :assoc-fn common/conj-option]
+   ["-a" "--artifact NAME" "If given, then only artifacts whose name matches are included. Repeatable."
+    :assoc-fn common/conj-option]
    common/cli-save-dot
    common/cli-no-view
    common/cli-help])
@@ -186,7 +191,7 @@
                    (map-vals common/flatten-dependencies)
                    ;; Reduce the inner maps to symbol -> version number string
                    (map-vals #(map-vals second %))
-                   artifact-versions-map
+                   (artifact-versions-map options)
                    (remove-vals no-conflicts?)
                    (into (sorted-map))
                    (node-graph options projects)

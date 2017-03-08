@@ -61,6 +61,7 @@ Usage: lein vizconflicts [options]
 Options:
   -o, --output-file FILE  target/conflicts.pdf  Output file path. Extension chooses format: pdf or png.
   -X, --exclude NAME                            Exclude any project whose name matches the value. Repeatable.
+  -a, --artifact NAME                           If given, then only artifacts whose name matches are included. Repeatable.
   -s, --save-dot                                Save the generated GraphViz DOT file well as the output file.
   -n, --no-view                                 If given, the image will not be opened after creation.
   -h, --help                                    This usage summary.
@@ -68,6 +69,14 @@ Options:
 
 `vizconflicts` is used in concert with [lein-sub](https://github.com/kumarshantanu/lein-sub) to analyze
 dependencies between and across a multi-module project.
+`visconflicts` identifies all artifacts in use across all sub-modules, and identifies where different
+versions of the same artifact are used.
+The generated document includes a diagram for each artifact that has such version conflicts.
+
+For very large projects, the resulting diagram can be very large (even overwhelming Graphviz's
+ability to create a legible layout).
+Projects can be excluded, using the `--exclude` option.
+Alternately, you can focus on a subset of conflicting artifacts using the `--artifact` option.
 
 When different versions of the same artifact are in use, the output chart will include a diagram of how that
 artifact is used across the different module:
