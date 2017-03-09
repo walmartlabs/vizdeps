@@ -24,7 +24,7 @@ trees more readable.
 To keep the graph from getting any more cluttered, the `org.clojure/clojure` artifact
 is treated specially (just the dependency from the project root is shown).
 
-The `--prune` is used when managing version conflicts; it removes uninteresting artifacts.
+The `--prune` option is used when managing version conflicts; it removes uninteresting artifacts.
 Those that remain either have a version conflict (such as `commons-codec`, below) or
 transitively depend on an artifact with such a conflict:
 
@@ -87,16 +87,16 @@ ability to create a legible layout).
 Projects can be excluded, using the `--exclude` option.
 Alternately, you can focus on a subset of conflicting artifacts using the `--artifact` option.
 
-When different versions of the same artifact are in use, the output chart will include a diagram of how that
-artifact is used across the different module:
+When different versions of the same artifact are in use, the output document will include a diagram of how that
+artifact is used across the different modules:
 
 ![conflicts](images/conflicts.png)
 
 The lines in each chart identify dependencies; solid lines are explicit dependencies,
 dotted lines are transitive dependencies.
 
-When one version is the majority, it is highlighted in blue (and other versions are
-drawn in red).
+When one version of the artifact is the majority (based on total number of dependencies),
+it is highlighted in blue (and other versions are drawn in red).
 
 ## License
 
