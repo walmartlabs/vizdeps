@@ -100,13 +100,9 @@
                            (immediate-dependencies (:project dependency-graph)
                                                    resolved-dependency)))))
 
-(defn ^:private prune-artifacts
-  "Navigates the nodes to identify dependencies that include conflicts.
-  Marks nodes that are referenced with conflicts, then marks any nodes that
-  have a dependency to that node as well. The root node is always kept;
-  other unmarked nodes are culled."
+(defn ^:private dependency-order
+  "Returns the artifact names in dependency order."
   [artifacts]
-  (main/debug "Pruning artifacts")
   (let [tuples (for [artifact (vals artifacts)
                      dep (:deps artifact)]
                  [(:artifact-name artifact)
@@ -114,8 +110,17 @@
         graph (reduce (fn [g [artifact-name dependency-name]]
                         (dep/depend g artifact-name dependency-name))
                       (dep/graph)
-                      tuples)
-        order (dep/topo-sort graph)
+                      tuples)]
+    (dep/topo-sort graph)))
+
+(defn ^:private prune-artifacts
+  "Navigates the nodes to identify dependencies that include conflicts.
+  Marks nodes that are referenced with conflicts, then marks any nodes that
+  have a dependency to that node as well. The root node is always kept;
+  other unmarked nodes are culled."
+  [artifacts]
+  (main/debug "Pruning artifacts")
+  (let [order (dependency-order artifacts)
         mark-graph (fn [artifacts artifact-name]
                      (assoc-in artifacts [artifact-name :conflict?] true))
         get-transitives (fn [artifacts artifact]
@@ -154,6 +159,7 @@
             marked-graph
             order)))
 
+
 (defn ^:private highlight-artifacts
   [artifacts highlight-terms]
   (let [highlight-set (->> artifacts
@@ -177,9 +183,37 @@
                {}
                artifacts-highlighted)))
 
+(defn ^:private apply-focus
+  "Identify a number of artifacts that match a focus term.  Only keep such artifacts, and those
+  that transitively depend on them."
+  [artifacts focus-terms]
+  (let [focus-set (->> artifacts
+                       keys
+                       (filter (common/matches-any focus-terms))
+                       set)
+        keep-focus (fn [artifacts dep]
+                     (-> artifacts
+                         (get (:artifact-name dep))
+                         :focused?))
+        reducer (fn [m artifact-name]
+                  (prn artifact-name)
+                  (let [artifact (get artifacts artifact-name)
+                        focus-deps (->> artifact
+                                        :deps
+                                        (filter #(keep-focus m %)))]
+                    (if (or (focus-set artifact-name)
+                            (seq focus-deps))
+                      (assoc m artifact-name
+                             (assoc artifact :focused? true
+                                    :deps focus-deps))
+                      m)))]
+    (reduce reducer
+            {}
+            (dependency-order artifacts))))
+
 (defn ^:private artifacts-map
   "Builds a map from artifact name (symbol) to an artifact record, with keys
-  :artifact-name, :version, :node-id, :highlight?, :conflict?, :root? and
+  :artifact-name, :version, :node-id, :highlight?, :focus?, :conflict?, :root? and
   :deps.
 
   Each :dep has keys :artifact-name, :version, :conflict?, and :highlight?."
@@ -187,6 +221,7 @@
   (let [profiles (if-not (:dev options)
                    [:user]
                    [:user :dev])
+        {:keys [:prune highlight focus]} options
         project' (project/set-profiles project profiles)
         root-artifact-name (symbol (-> project :group str) (-> project :name str))
         root-dependency [root-artifact-name (:version project)]
@@ -205,11 +240,14 @@
         ;; Ensure the root artifact is drawn properly and never pruned
         (assoc-in [root-artifact-name :root?] true)
         (cond->
-          (:prune options)
+          prune
           prune-artifacts
 
-          (-> options :highlight seq)
-          (highlight-artifacts (:highlight options))))))
+          (seq focus)
+          (apply-focus focus)
+
+          (seq highlight)
+          (highlight-artifacts highlight)))))
 
 (defn ^:private node-graph
   [artifacts options]
@@ -253,14 +291,16 @@
       d/dot))
 
 (def ^:private cli-options
-  [(common/cli-output-file "target/dependencies.pdf")
-   common/cli-save-dot
-   common/cli-no-view
+  [["-d" "--dev" "Include :dev dependencies in the graph."]
+   ["-f" "--focus ARTIFACT" "Excludes artifacts whose names do not match a supplied value. Repeatable."
+    :assoc-fn common/conj-option]
    ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue. Repeatable."
     :assoc-fn common/conj-option]
-   common/cli-vertical
-   ["-d" "--dev" "Include :dev dependencies in the graph."]
+   common/cli-no-view
+   (common/cli-output-file "target/dependencies.pdf")
    ["-p" "--prune" "Exclude artifacts and dependencies that do not involve version conflicts."]
+   common/cli-save-dot
+   common/cli-vertical
    common/cli-help])
 
 (defn vizdeps

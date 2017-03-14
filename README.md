@@ -50,17 +50,22 @@ On other platforms, Graphviz can be [downloaded](http://www.graphviz.org/Downloa
 Usage: lein vizdeps [options]
 
 Options:
-  -o, --output-file FILE    target/dependencies.pdf  Output file path. Extension chooses format: pdf or png.
-  -s, --save-dot                                     Save the generated GraphViz DOT file well as the output file.
-  -n, --no-view                                      If given, the image will not be opened after creation.
-  -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue. Repeatable.
-  -v, --vertical                                     Use a vertical, not horizontal, layout.
   -d, --dev                                          Include :dev dependencies in the graph.
+  -f, --focus ARTIFACT                               Excludes artifacts whose names do not match a supplied value. Repeatable.
+  -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue. Repeatable.
+  -n, --no-view                                      If given, the image will not be opened after creation.
+  -o, --output-file FILE    target/dependencies.pdf  Output file path. Extension chooses format: pdf or png.
   -p, --prune                                        Exclude artifacts and dependencies that do not involve version conflicts.
+  -s, --save-dot                                     Save the generated GraphViz DOT file well as the output file.
+  -v, --vertical                                     Use a vertical, not horizontal, layout.
   -h, --help                                         This usage summary.
 ```
 
 The `--highlight` option can be repeated; any artifact that contains any of the provided strings will be highlighted.
+
+The `--focus` option allows you to mark some dependencies for inclusion; every artifact that does not match, or does not
+transitively depend on a marked artifact, is excluded.
+This is very useful when trying to work out how a specific artifact is transitively included.
 
 ## vizconflicts task
 

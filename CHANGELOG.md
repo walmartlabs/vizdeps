@@ -1,3 +1,7 @@
+## 0.1.5 -- 14 Mar 2017
+
+Added --focus option to vizdeps task.
+
 ## 0.1.4 -- 8 Mar 2017
 
 [Closed Issues](https://github.com/walmartlabs/vizdeps/milestone/1?closed=1)
