@@ -196,7 +196,6 @@
                          (get (:artifact-name dep))
                          :focused?))
         reducer (fn [m artifact-name]
-                  (prn artifact-name)
                   (let [artifact (get artifacts artifact-name)
                         focus-deps (->> artifact
                                         :deps

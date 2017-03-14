@@ -30,9 +30,16 @@ transitively depend on an artifact with such a conflict:
 
 ![rook-purged](images/rook-pruned.png)
 
+Often, you are struck trying to track down why a specific artifact is included.
+In large projects, the Graphviz chart can become difficult to read.
+Use the `-f` / `--focus` option to limit which artifacts are shown.
+For example, `lein vizdeps --vertical --focus jackson-core`:
+
+![rook-focused](images/rook-focus.png)
+
 ## Installation
 
-Put `[walmartlabs/vizdeps "0.1.5"]` into the `:plugins` vector of your `:user`
+Put `[walmartlabs/vizdeps "0.1.6"]` into the `:plugins` vector of your `:user`
 profile.
 
 The plugin makes use of the `dot` command,part of Graphviz,
