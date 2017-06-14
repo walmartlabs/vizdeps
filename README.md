@@ -2,7 +2,7 @@
 
 [![Clojars Project](http://clojars.org/walmartlabs/vizdeps/latest-version.svg)](http://clojars.org/walmartlabs/vizdeps)
 
-An alternative to `lein deps :tree` that uses [Graphviz](http:://graphviz.org) to present
+An alternative to `lein deps :tree` that uses [Graphviz](http://graphviz.org) to present
 a dependency diagram of all the artifacts (Maven-speak for "libraries") in your project.
 
 Here's an example of a relatively small project:
