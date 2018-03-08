@@ -39,7 +39,7 @@ For example, `lein vizdeps --vertical --focus jackson-core`:
 
 ## Installation
 
-Put `[walmartlabs/vizdeps "0.1.6"]` into the `:plugins` vector of your `:user`
+Put `[walmartlabs/vizdeps "0.1.7"]` into the `:plugins` vector of your `:user`
 profile.
 
 The plugin makes use of the `dot` command,part of Graphviz,

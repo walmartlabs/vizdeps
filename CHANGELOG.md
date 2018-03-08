@@ -1,3 +1,7 @@
+## 0.1.7 -- 8 Mar 2018
+
+Add missing `tools.cli` dependency
+
 ## 0.1.6 -- 14 Mar 2017
 
 Update README and remove debugging output accidentally included in 0.1.5.
