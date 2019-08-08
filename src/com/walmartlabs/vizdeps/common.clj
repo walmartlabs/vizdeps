@@ -94,7 +94,7 @@
     (d/save! dot output-file {:format output-format})
 
     (when-not no-view
-      (browse-url output-path)))
+      (browse-url (-> output-file .toURI .toString))))
 
   nil)
 
