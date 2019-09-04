@@ -4,7 +4,7 @@
 
 > We're moving to [clj-commons](https://github.com/clj-commons/vizdeps)!
 
-An alternative to `lein deps :tree` that uses [Graphviz](http:://graphviz.org) to present
+An alternative to `lein deps :tree` that uses [Graphviz](http://graphviz.org) to present
 a dependency diagram of all the artifacts (Maven-speak for "libraries") in your project.
 
 Here's an example of a relatively small project:
