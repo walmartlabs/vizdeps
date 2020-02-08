@@ -1,3 +1,7 @@
+## 0.2.0 -- UNRELEASED
+
+Updated to work with more recent versions of Leiningen (2.8.1 and above).
+
 ## 0.1.6 -- 14 Mar 2017
 
 Update README and remove debugging output accidentally included in 0.1.5.

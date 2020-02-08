@@ -7,8 +7,7 @@
     [leiningen.core.main :as main]
     [dorothy.core :as d]
     [leiningen.core.classpath :as classpath]
-    [leiningen.core.project :as project]
-    [clojure.string :as str]))
+    [leiningen.core.project :as project]))
 
 (defn ^:private artifact->label
   [artifact]
@@ -32,10 +31,9 @@
 (defn ^:private immediate-dependencies
   [project dependency]
   (if (some? dependency)
-    (-> (#'classpath/get-dependencies-memoized
+    (-> (#'classpath/get-dependencies
           :dependencies nil
-          (assoc project :dependencies [dependency])
-          nil)
+          (assoc project :dependencies [dependency]))
         (get dependency)
         ;; Tracking dependencies on Clojure itself overwhelms the graph
         (as-> $
