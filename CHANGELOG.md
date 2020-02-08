@@ -1,4 +1,4 @@
-## 0.2.0 -- UNRELEASED
+## 0.2.0 -- 7 Feb 2020
 
 Updated to work with more recent versions of Leiningen (2.8.1 and above).
 
