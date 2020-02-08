@@ -114,6 +114,6 @@ it is highlighted in blue (and other versions are drawn in red).
 
 ## License
 
-Copyright © 2016-2017 Walmartlabs
+Copyright © 2016- Walmartlabs
 
 Distributed under the Apache Software License 2.0.
