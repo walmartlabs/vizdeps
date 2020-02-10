@@ -41,10 +41,10 @@ For example, `lein vizdeps --vertical --focus jackson-core`:
 
 ## Installation
 
-Put `[walmartlabs/vizdeps "0.1.6"]` into the `:plugins` vector of your `:user`
+Put `[walmartlabs/vizdeps "0.2.0"]` into the `:plugins` vector of your `:user`
 profile.
 
-The plugin makes use of the `dot` command,part of Graphviz,
+The plugin makes use of the `dot` command, part of Graphviz,
 which must be installed.
 On OS X, Graphviz can be installed using [Homebrew](https://brew.sh/):
 
