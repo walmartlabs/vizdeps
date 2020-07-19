@@ -1,4 +1,4 @@
-(defproject walmartlabs/vizdeps "0.2.0"
+(defproject cc.artifice/vizdeps "0.2.1-josh"
   :description "Visualize Leiningen project dependencies using Graphviz."
   :url "https://github.com/walmartlabs/vizdeps"
   :license {:name "Apache Sofware License 2.0"
