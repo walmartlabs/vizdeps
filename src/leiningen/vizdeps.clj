@@ -48,6 +48,8 @@
   [dependency-graph artifact-name artifact-version dependencies]
   (reduce (fn [g dep]
             (let [[dep-name dep-version] dep
+                  ;; get version from parent project if not found in this project
+                  dep-version (or dep-version (second (get-in dependency-graph [:dependencies dep-name])))
                   g-1 (add-dependency-tree g dep-name dep-version)]
               (if-let [dep-artifact (get-in g-1 [:artifacts dep-name])]
                 (let [dep-map {:artifact-name dep-name
