@@ -59,7 +59,7 @@ On other platforms, Graphviz can be [downloaded](http://www.graphviz.org/Downloa
 Usage: lein vizdeps [options]
 
 Options:
-  -d, --dev                                          Include :dev dependencies in the graph.
+  -P, --profiles PROFILE_STR  [:user]                Comma-delimited list of profiles to use. E.g. -p user,dev
   -f, --focus ARTIFACT                               Excludes artifacts whose names do not match a supplied value. Repeatable.
   -H, --highlight ARTIFACT                           Highlight the artifact, and any dependencies to it, in blue. Repeatable.
   -n, --no-view                                      If given, the image will not be opened after creation.
