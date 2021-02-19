@@ -7,7 +7,8 @@
     [leiningen.core.main :as main]
     [dorothy.core :as d]
     [leiningen.core.classpath :as classpath]
-    [leiningen.core.project :as project]))
+    [leiningen.core.project :as project]
+    [clojure.string :as str]))
 
 (defn ^:private artifact->label
   [artifact]
@@ -215,9 +216,7 @@
 
   Each :dep has keys :artifact-name, :version, :conflict?, and :highlight?."
   [project options]
-  (let [profiles (if-not (:dev options)
-                   [:user]
-                   [:user :dev])
+  (let [profiles (:profiles options)
         {:keys [:prune highlight focus]} options
         project' (project/set-profiles project profiles)
         root-artifact-name (symbol (-> project :group str) (-> project :name str))
@@ -287,8 +286,15 @@
       d/digraph
       d/dot))
 
+(defn- parse-profile-str
+  [profile-str]
+  (let [profiles (str/split profile-str #",")]
+    (mapv keyword profiles)))
+
 (def ^:private cli-options
-  [["-d" "--dev" "Include :dev dependencies in the graph."]
+  [["-P" "--profiles PROFILE_STR" "Comma-delimited list of profiles to use. E.g. -p user,dev"
+    :parse-fn parse-profile-str
+    :default [:user]]
    ["-f" "--focus ARTIFACT" "Excludes artifacts whose names do not match a supplied value. Repeatable."
     :assoc-fn common/conj-option]
    ["-H" "--highlight ARTIFACT" "Highlight the artifact, and any dependencies to it, in blue. Repeatable."
